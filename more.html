@@ -89,6 +89,14 @@
         transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
         resize: none;
     }
+
+div.imgcnt {
+    /* text-align: center; */ /* no longer need this */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center; /* if you want the `.img` elements centered on the page */
+}
+
 </style>
 
 <html>
@@ -237,162 +245,147 @@
    </tr>
     </table>
 
-            <!-- <br> -->
-            <br>
-            <table align=center width=1000px>
-                <tr>
-                    <td width=1000px>
-                      <center>
-                          <video loop controls muted autoplay playsinline class="bigvideo">
-                            <!-- <source src="https://people.eecs.berkeley.edu/~jathushan/projects/4dhumans/video1.mp4" type="video/mp4"> -->
-                            <source src="https://www.cs.utexas.edu/~pavlakos/hamer/resources/video1_results.mp4" type="video/mp4">
-                          </video>
-                    </center>
-                    </td>
-                </tr>
-                <tr>
-                    <td width=200px class="caption">
-                          We present HaMeR, an approach for Hand Mesh Recovery from a single image. Given a bounding box of the hand and the hand side (left/right), we use a deep network to reconstruct the hand in 3D in the form of a MANO mesh. Our approach is applied on each frame independently, yet it recovers temporally smooth results. HaMeR is accurate and particularly robust in cases with occlusions, truncations, different skin colors, hands with different appearances (e.g., wearing gloves), as well as hands interacting with other hands or objects.
-                    </td>
-                </tr>
-            </table>
 
             <br><br>
             <!-- Bold abstract subtitle -->
             <hr>
             <div>
-              <h1>Abstract</h1>
-              We present an approach that can reconstruct hands in 3D from monocular input. Our approach for Hand Mesh Recovery, HaMeR, follows a fully transformer-based architecture and can analyze hands with significantly increased accuracy and robustness compared to previous work. The key to HaMeR's success lies in scaling up both the data used for training and the capacity of the deep network for hand reconstruction. For training data, we combine multiple datasets that contain 2D or 3D hand annotations. For the deep model, we use a large scale Vision Transformer architecture. Our final model consistently outperforms the previous baselines on popular 3D hand pose benchmarks. To further evaluate the effect of our design in non-controlled settings, we annotate existing in-the-wild datasets with 2D hand keypoint annotations. On this newly collected dataset of annotations, HInt, we demonstrate significant improvements over existing baselines. We will make our code, data and models publicly available upon publication.
+              <h1>More Results</h1>
+              <table>
+                <tr>
+                  <td class="center">
+                    For these videos, we detect hands using a <a href="https://github.com/ViTAE-Transformer/ViTPose">wholebody keypoint detector</a>. We have also experimented with using a <a href="https://openreview.net/forum?id=6ldTxwhgtP">hand bounding box detector</a>. The wholebody detector is more robust for smaller hands, where part of the rest of the body is visible. Since it is using the body context, it is more accurate at estimating side information (left/right). However, it requires running a person detector first. On the other hand, the hand bounding box detector is more accurate with larger hands, does not require additional preprocessing (i.e., human detector), but can miss smaller hands and is more prone to left-right classification errors. We will provide both alternatives with our demo code.
+                  </td>
+                </tr>
+               </table>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/Yi3wlGxqlU0?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/8K1sPY3vayg?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/ihBhrMYltqo?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/zVr2mNs5d_M?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/OsE0vNb7kfc?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/poDG0jjHIxE?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/KAvlmj0zMVE?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/p_tp_0jFfJI?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/sJD-jtVNIME?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/QY0WATMiwl8?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/DXzn3Ubql10?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/waijqauQ9og?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/uT4RJDIZPLg?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/_dO6JWSP5Tk?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/1R7rBviEO6A?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/Vk4bQ5a-GuU?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/J9jz4Tjx6po?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/MsLN8Ji2jkg?autoplay=1&mute=1&loop=1">
+                  </iframe> 
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/bWSyDZs6Go8?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/6BUl9KDf0E8?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/I4_OhxNhzqU?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/dJ8fBE-lG1o?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/sSZr0CheThc?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/DGrUwOtGJ8s?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/boNoXypS4iE?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/oIwT5pCCpfw?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
+                <div class="imgcnt">
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/LCQZnjQHBbQ?autoplay=1&mute=1&loop=1">
+                  </iframe>
+
+                  <iframe width="480" height="360"
+                  src="https://www.youtube.com/embed/Qa-fNlkSeC4?autoplay=1&mute=1&loop=1">
+                  </iframe>
+                </div>
             </div>
             <br><br>
             <hr>
-
-            <h1>HaMeR Approach</h1>
-            <table>
-                <tr>
-                  <img class="round" style="width:1000px" src="resources/hamer.png"/>
-                </tr>
-                <tr>
-                  <td class="caption">
-                    HaMeR uses a fully transformer-based network design. HaMeR takes as input a single image of a hand and predicts the MANO model parameters, which are used to get the 3D hand mesh.
-                  </td>
-              </tr>
-              </table>
-              <br>
-              <hr>
-
-            <h1>HInt Dataset</h1>
-            <table>
-                <tr>
-                  <img class="round" style="width:1000px" src="resources/hint.png"/>
-                </tr>
-                <tr>
-                  <td class="caption">
-                    We introduce HInt, a dataset focusing on Hand Interactions. We sample frames from New Days of Hands, EpicKitchens-VISOR and Ego4D and we annotate the hands with 2D keypoints. Since the frames are coming from video, they capture more natural interactions of the hands.
-                  </td>
-              </tr>
-              </table>
-              <br>
-              <hr>
-
-              <h1>Results</h1>
-              <h4>Comparisons to existing approaches</h4>
-              <table>
-                <tr>
-                  <td>
-                          <video loop controls muted autoplay playsinline class="bigvideo">
-                          <source src="https://www.cs.utexas.edu/~pavlakos/hamer/resources/video2_comparison.mp4" type="video/mp4">
-                          </video>
-                  </td>
-                </tr>
-
-                <tr>
-                    <td class="caption">
-                      We present comparisons to previous state-of-the-art approaches, FrankMocap and Mesh Graphormer for 3D hand mesh reconstruction. HaMeR is more robust and accurate across a variety of hand poses and viewpoints. The baselines suffer from failure cases under occlusions, truncations or unexpected illuminations, while being significantly more jittery than HaMeR.
-                    </td>
-                </tr>
-                </table>
-                <br>
-
-                <center><h4>Side-View Visualizations</h4></center>
-                <table align=center>
-                  <tr>
-                    <td>
-                      <center>
-                                <video loop controls muted autoplay playsinline class="bigvideo"  >
-                                <source src="https://www.cs.utexas.edu/~pavlakos/hamer/resources/video3_novelview.mp4" type="video/mp4">
-                                </video>
-
-                    </center>
-                    </td>
-                  </tr>
-                  <tr>
-                      <td class="caption">
-                        In this video, we also visualize the reconstructed hand meshes from a novel viewpoint (specifically a top view, compared to the camera view). The reconstruction from HaMeR are temporally stable even when observed from this novel viewpoint. As in all videos, the results are estimated on a per-frame basis, without any additional smoothing.
-                      </td>
-                  </tr>
-                </table>
-                <br>
-              <hr>
-
-            <h1>Limitations</h1>
-            <table>
-                <tr>
-                  <td class="center">
-                    The main failure modes include spurious hand detections, errors in left/right hand classification, and extremely hard poses. You can see more results on long videos <a href="more.html">here</a>.
-                  </td>
-              </tr>
-             </table>
-             <table>
-                <tr>
-                  <img class="round" style="width:1000px" src="resources/limitation.jpg"/>
-                </tr>
-                <tr>
-                  <td class="caption">
-                    Similar to prior work, HaMeR requires the hand side (left/right) information for the input image. When the given hand side is correct (left), the reconstructions align well with the 2D hands; when the given hand side is incorrect (right), the reconstructions are expected to be incorrect (i.e., since the model reconstructs a hand of the opposite side), but HaMeR often returns a reasonable interpretation of the input image.
-                  </td>
-                </tr>
-                </table>
-                <table>
-                <tr>
-                  <img class="round" style="width:1000px" src="resources/failures.jpg"/>
-                </tr>
-                <tr>
-                  <td class="caption">
-                    We include representative failure cases of our approach. HaMeR may fail under extreme finger poses, unnatural appearance, extreme occlusions, or unnatural shape (e.g., robotic hand with finger sizes that do not follow the typical human proportions).
-                  </td>
-              </tr>
-              </table>
-              <br>
-
-            <table>
-
-              </table>
-
-
-                <!-- <center><h3>Amodal Completion</h3></center>
-                <table align=center width=900px>
-                  <tr>
-                    <td width=900px>
-                      <center>
-                          
-                                <video loop controls width="900px">
-                                <source src="https://people.eecs.berkeley.edu/~jathushan/projects/4dhumans/video4_amodal.mp4" type="video/mp4">
-                                </video>
-
-                    </center>
-                    </td>
-                  </tr>
-                  <tr>
-                      <td width=600px>
-                        <center>
-                            <span style="font-size:14px"><i>We can amodally complete our tracklets in frames with missing detections (e.g., occlusions)</i>
-                      </center>
-                      </td>
-                  </tr>
-                </table>
-                <br> -->
-                <hr>
 
                 <table align=center width=1000px>
                   <tr>
