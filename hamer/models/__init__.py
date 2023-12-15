@@ -12,7 +12,7 @@ def download_models(folder=CACHE_DIR_HAMER):
     import os
     os.makedirs(folder, exist_ok=True)
     download_files = {
-        "hamer_data.tar.gz"      : ["https://www.dropbox.com/s/6zejmxu0aur3568/hamer_demo_data.tar.gz", folder],
+        "hamer_data.tar.gz"      : ["https://www.cs.utexas.edu/~pavlakos/hamer/data/hamer_demo_data.tar.gz", folder],
     }
     
     for file_name, url in download_files.items():
@@ -26,7 +26,7 @@ def download_models(folder=CACHE_DIR_HAMER):
             # if ends with tar.gz, tar -xzf
             if file_name.endswith(".tar.gz"):
                 print("Extracting file: " + file_name)
-                os.system("tar -xvf " + output_path + " -C " + url[1])
+                os.system("tar -xvf " + output_path)
 
 DEFAULT_CHECKPOINT=f'{CACHE_DIR_HAMER}/hamer_ckpts/checkpoints/hamer.ckpt'
 def load_hamer(checkpoint_path=DEFAULT_CHECKPOINT):

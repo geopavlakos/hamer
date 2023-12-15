@@ -6,6 +6,7 @@ setup(
     name='hamer',
     packages=find_packages(),
     install_requires=[
+        'gdown',
         'numpy',
         'opencv-python',
         'pyrender',
