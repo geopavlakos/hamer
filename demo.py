@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--save_mesh', dest='save_mesh', action='store_true', default=False, help='If set, save meshes to disk also')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size for inference/fitting')
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
+    parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety'], help='Using regnety improves runtime and reduces memory')
     parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
 
     args = parser.parse_args()
@@ -43,14 +44,22 @@ def main():
 
     # Load detector
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
-    from detectron2.config import LazyConfig
-    import hamer
-    cfg_path = Path(hamer.__file__).parent/'configs'/'cascade_mask_rcnn_vitdet_h_75ep.py'
-    detectron2_cfg = LazyConfig.load(str(cfg_path))
-    detectron2_cfg.train.init_checkpoint = "https://dl.fbaipublicfiles.com/detectron2/ViTDet/COCO/cascade_mask_rcnn_vitdet_h/f328730692/model_final_f05665.pkl"
-    for i in range(3):
-        detectron2_cfg.model.roi_heads.box_predictors[i].test_score_thresh = 0.25
-    detector = DefaultPredictor_Lazy(detectron2_cfg)
+    if args.body_detector == 'vitdet':
+        from detectron2.config import LazyConfig
+        import hamer
+        cfg_path = Path(hamer.__file__).parent/'configs'/'cascade_mask_rcnn_vitdet_h_75ep.py'
+        detectron2_cfg = LazyConfig.load(str(cfg_path))
+        detectron2_cfg.train.init_checkpoint = "https://dl.fbaipublicfiles.com/detectron2/ViTDet/COCO/cascade_mask_rcnn_vitdet_h/f328730692/model_final_f05665.pkl"
+        for i in range(3):
+            detectron2_cfg.model.roi_heads.box_predictors[i].test_score_thresh = 0.25
+        detector = DefaultPredictor_Lazy(detectron2_cfg)
+    elif args.body_detector == 'regnety':
+        from detectron2 import model_zoo
+        from detectron2.config import get_cfg
+        detectron2_cfg = model_zoo.get_config('new_baselines/mask_rcnn_regnety_4gf_dds_FPN_400ep_LSJ.py', trained=True)
+        detectron2_cfg.model.roi_heads.box_predictor.test_score_thresh = 0.5
+        detectron2_cfg.model.roi_heads.box_predictor.test_nms_thresh   = 0.4
+        detector       = DefaultPredictor_Lazy(detectron2_cfg)
 
     # keypoint detector
     cpm = ViTPoseModel(device)
