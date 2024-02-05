@@ -77,8 +77,8 @@ def render_keypoints(img: np.array,
                 thicknessLineScaled = int(round(min(thicknessLine[index1], thicknessLine[index2]) * pose_scales[0]))
                 colorIndex = index2
                 color = colors[colorIndex % numberColors]
-                keypoint1 = keypoints[index1, :-1].astype(np.int)
-                keypoint2 = keypoints[index2, :-1].astype(np.int)
+                keypoint1 = keypoints[index1, :-1].astype(np.int32)
+                keypoint2 = keypoints[index2, :-1].astype(np.int32)
                 cv2.line(img, tuple(keypoint1.tolist()), tuple(keypoint2.tolist()), tuple(color.tolist()), thicknessLineScaled, lineType, shift)
         for part in range(len(keypoints)):
             faceIndex = part
@@ -87,7 +87,7 @@ def render_keypoints(img: np.array,
                 thicknessCircleScaled = int(round(thicknessCircle[faceIndex] * pose_scales[0]))
                 colorIndex = part
                 color = colors[colorIndex % numberColors]
-                center = keypoints[faceIndex, :-1].astype(np.int)
+                center = keypoints[faceIndex, :-1].astype(np.int32)
                 cv2.circle(img, tuple(center.tolist()), radiusScaled, tuple(color.tolist()), thicknessCircleScaled, lineType, shift)
     return img
 

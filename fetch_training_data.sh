@@ -14,6 +14,6 @@ gdown https://drive.google.com/uc?id=1ozejeAue1M-p4boIfpnpX0E8RFIeHUZH # hamer_t
 #wget -O hamer_training_data_part4b.tar.gz https://www.dropbox.com/scl/fi/vyjasngr67ru14fb8s108/hamer_training_data_part4b.tar.gz?rlkey=qgotg1v9lkgo5eu78gh8b007t
 #wget -O hamer_training_data_part4c.tar.gz https://www.dropbox.com/scl/fi/nfvz5zpcmhz8hkwzc6ji4/hamer_training_data_part4c.tar.gz?rlkey=ygh0wvse04twhh1ri3xiw2sag
 
-for f in hamer_training_data_part*.tar; do
+for f in hamer_training_data_part*.tar.gz; do
     tar --warning=no-unknown-keyword --exclude=".*" -xvf $f
 done

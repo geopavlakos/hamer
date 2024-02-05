@@ -31,9 +31,9 @@ class HAMER(pl.LightningModule):
         self.cfg = cfg
         # Create backbone feature extractor
         self.backbone = create_backbone(cfg)
-        #if cfg.MODEL.BACKBONE.get('PRETRAINED_WEIGHTS', None):
-        #    log.info(f'Loading backbone weights from {cfg.MODEL.BACKBONE.PRETRAINED_WEIGHTS}')
-        #    self.backbone.load_state_dict(torch.load(cfg.MODEL.BACKBONE.PRETRAINED_WEIGHTS, map_location='cpu')['state_dict'])
+        if cfg.MODEL.BACKBONE.get('PRETRAINED_WEIGHTS', None):
+            log.info(f'Loading backbone weights from {cfg.MODEL.BACKBONE.PRETRAINED_WEIGHTS}')
+            self.backbone.load_state_dict(torch.load(cfg.MODEL.BACKBONE.PRETRAINED_WEIGHTS, map_location='cpu')['state_dict'])
 
         # Create MANO head
         self.mano_head = build_mano_head(cfg)
@@ -63,12 +63,6 @@ class HAMER(pl.LightningModule):
 
         # Disable automatic optimization since we use adversarial training
         self.automatic_optimization = False
-
-    def on_after_backward(self):
-        for name, param in self.named_parameters():
-            if param.grad is None:
-                print(param.shape)
-                print(name)
 
     def get_parameters(self):
         all_params = list(self.mano_head.parameters())
@@ -188,8 +182,6 @@ class HAMER(pl.LightningModule):
         loss = self.cfg.LOSS_WEIGHTS['KEYPOINTS_3D'] * loss_keypoints_3d+\
                self.cfg.LOSS_WEIGHTS['KEYPOINTS_2D'] * loss_keypoints_2d+\
                sum([loss_mano_params[k] * self.cfg.LOSS_WEIGHTS[k.upper()] for k in loss_mano_params])
-
-        #loss = loss + 0*self.mano.body_pose.mean()
 
         losses = dict(loss=loss.detach(),
                       loss_keypoints_2d=loss_keypoints_2d.detach(),
