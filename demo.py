@@ -88,7 +88,7 @@ def main():
 
         # Detect human keypoints for each person
         vitposes_out = cpm.predict_pose(
-            img_cv2,
+            img,
             [np.concatenate([pred_bboxes, pred_scores[:, None]], axis=1)],
         )
 
