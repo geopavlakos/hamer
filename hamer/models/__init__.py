@@ -12,7 +12,7 @@ def download_models(folder=CACHE_DIR_HAMER):
     import os
     os.makedirs(folder, exist_ok=True)
     download_files = {
-        "hamer_data.tar.gz"      : ["https://www.cs.utexas.edu/~pavlakos/hamer/data/hamer_demo_data.tar.gz", folder],
+        "hamer_demo_data.tar.gz"      : ["https://www.cs.utexas.edu/~pavlakos/hamer/data/hamer_demo_data.tar.gz", folder],
     }
     
     for file_name, url in download_files.items():
@@ -40,6 +40,12 @@ def load_hamer(checkpoint_path=DEFAULT_CHECKPOINT):
         model_cfg.defrost()
         assert model_cfg.MODEL.IMAGE_SIZE == 256, f"MODEL.IMAGE_SIZE ({model_cfg.MODEL.IMAGE_SIZE}) should be 256 for ViT backbone"
         model_cfg.MODEL.BBOX_SHAPE = [192,256]
+        model_cfg.freeze()
+
+    # Update config to be compatible with demo
+    if ('PRETRAINED_WEIGHTS' in model_cfg.MODEL.BACKBONE):
+        model_cfg.defrost()
+        model_cfg.MODEL.BACKBONE.pop('PRETRAINED_WEIGHTS')
         model_cfg.freeze()
 
     model = HAMER.load_from_checkpoint(checkpoint_path, strict=False, cfg=model_cfg)
