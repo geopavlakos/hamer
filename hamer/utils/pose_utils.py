@@ -90,9 +90,11 @@ class Evaluator:
 
     def __init__(self,
                  dataset_length: int,
+                 dataset: str,
                  keypoint_list: List,
                  pelvis_ind: int,
                  metrics: List = ['mode_mpjpe', 'mode_re', 'min_mpjpe', 'min_re'],
+                 preds: List = ['vertices', 'keypoints_3d'],
                  pck_thresholds: Optional[List] = None):
         """
         Class used for evaluating trained models on different 3D pose datasets.
@@ -103,11 +105,20 @@ class Evaluator:
             metrics [List]: List of evaluation metrics to record.
         """
         self.dataset_length = dataset_length
+        self.dataset = dataset
         self.keypoint_list = keypoint_list
         self.pelvis_ind = pelvis_ind
         self.metrics = metrics
-        for metric in self.metrics:
-            setattr(self, metric, np.zeros((dataset_length,)))
+        self.preds = preds
+        if self.metrics is not None:
+            for metric in self.metrics:
+                setattr(self, metric, np.zeros((dataset_length,)))
+        if self.preds is not None:
+            for pred in self.preds:
+                if pred == 'vertices':
+                    self.vertices = np.zeros((dataset_length, 778, 3))
+                if pred == 'keypoints_3d':
+                    self.keypoints_3d = np.zeros((dataset_length, 21, 3))
         self.counter = 0
         if pck_thresholds is None:
             self.pck_evaluator = None
@@ -124,12 +135,13 @@ class Evaluator:
         print(f'{self.counter} / {self.dataset_length} samples')
         if self.pck_evaluator is not None:
             self.pck_evaluator.log()
-        for metric in self.metrics:
-            if metric in ['mode_mpjpe', 'mode_re', 'min_mpjpe', 'min_re']:
-                unit = 'mm'
-            else:
-                unit = ''
-            print(f'{metric}: {getattr(self, metric)[:self.counter].mean()} {unit}')
+        if self.metrics is not None:
+            for metric in self.metrics:
+                if metric in ['mode_mpjpe', 'mode_re', 'min_mpjpe', 'min_re']:
+                    unit = 'mm'
+                else:
+                    unit = ''
+                print(f'{metric}: {getattr(self, metric)[:self.counter].mean()} {unit}')
         print('***')
 
     def get_metrics_dict(self) -> Dict:
@@ -141,6 +153,14 @@ class Evaluator:
         if self.pck_evaluator is not None:
             d2 = self.pck_evaluator.get_metrics_dict()
             d1.update(d2)
+        return d1
+
+    def get_preds_dict(self) -> Dict:
+        """
+        Returns:
+            Dict: Dictionary of evaluation preds.
+        """
+        d1 = {pred: getattr(self, pred)[:self.counter] for pred in self.preds}
         return d1
 
     def __call__(self, output: Dict, batch: Dict, opt_output: Optional[Dict] = None):
@@ -159,6 +179,7 @@ class Evaluator:
         batch_size = pred_keypoints_3d.shape[0]
         num_samples = pred_keypoints_3d.shape[1]
         gt_keypoints_3d = batch['keypoints_3d'][:, :, :-1].unsqueeze(1).repeat(1, num_samples, 1, 1)
+        pred_vertices = output['pred_vertices'].detach()
 
         # Align predictions and ground truth such that the pelvis location is at the origin
         pred_keypoints_3d -= pred_keypoints_3d[:, :, [self.pelvis_ind]]
@@ -170,9 +191,10 @@ class Evaluator:
         re = re.reshape(batch_size, num_samples)
 
         # Compute 2d keypoint errors
+        bbox_expand_factor = batch['bbox_expand_factor'][:,None,None,None].detach()
         pred_keypoints_2d = output['pred_keypoints_2d'].detach()
-        pred_keypoints_2d = pred_keypoints_2d[:,None,:,:]
-        gt_keypoints_2d = batch['keypoints_2d'][:,None,:,:].repeat(1, num_samples, 1, 1)
+        pred_keypoints_2d = pred_keypoints_2d[:,None,:,:]*bbox_expand_factor
+        gt_keypoints_2d = batch['keypoints_2d'][:,None,:,:].repeat(1, num_samples, 1, 1)*bbox_expand_factor
         conf = gt_keypoints_2d[:, :, :, -1].clone()
         kp_err = torch.nn.functional.mse_loss(
                         pred_keypoints_2d,
@@ -211,6 +233,12 @@ class Evaluator:
             self.opt_mpjpe[self.counter:self.counter+batch_size] = opt_mpjpe
         if hasattr(self, 'opt_re'):
             self.opt_re[self.counter:self.counter+batch_size] = opt_re
+        if hasattr(self, 'vertices'):
+            self.vertices[self.counter:self.counter+batch_size] = pred_vertices.cpu().numpy()
+        if hasattr(self, 'keypoints_3d'):
+            if self.dataset == 'HO3D-VAL':
+                pred_keypoints_3d = pred_keypoints_3d[:,:,[0,5,6,7,9,10,11,17,18,19,13,14,15,1,2,3,4,8,12,16,20]]
+            self.keypoints_3d[self.counter:self.counter+batch_size] = pred_keypoints_3d.squeeze().cpu().numpy()
 
         self.counter += batch_size
 
@@ -236,6 +264,7 @@ class EvaluatorPCK:
         self.pred_kp_2d = []
         self.gt_kp_2d = []
         self.gt_conf_2d = []
+        self.scale = []
         self.counter = 0
 
     def log(self):
@@ -267,22 +296,30 @@ class EvaluatorPCK:
         pred_kp_2d = np.concatenate(self.pred_kp_2d, axis=0)
         gt_kp_2d = np.concatenate(self.gt_kp_2d, axis=0)
         gt_conf_2d = np.concatenate(self.gt_conf_2d, axis=0)
+        scale = np.concatenate(self.scale, axis=0)
         assert pred_kp_2d.shape == gt_kp_2d.shape
         assert pred_kp_2d[..., 0].shape == gt_conf_2d.shape
         assert pred_kp_2d.shape[1] == 1 # num_samples
+        assert scale.shape[0] == gt_conf_2d.shape[0] # num_samples
 
-        from mmpose.core.evaluation import keypoint_pck_accuracy
         pcks = [
-            keypoint_pck_accuracy(
+            self.keypoint_pck_accuracy(
                 pred_kp_2d[:, 0, :, :],
                 gt_kp_2d[:, 0, :, :],
                 gt_conf_2d[:, 0, :]>0.5,
                 thr=thr,
-                normalize = np.ones((len(pred_kp_2d),2))   # Already in [-0.5,0.5] range. No need to normalize
+                scale = scale[:,None]
             )
             for thr in self.thresholds
         ]
         return pcks
+
+    def keypoint_pck_accuracy(self, pred, gt, conf, thr, scale):
+        dist = np.sqrt(np.sum((pred-gt)**2, axis=2))
+        all_joints = conf>0.5
+        correct_joints = np.logical_and(dist<=scale*thr, all_joints)
+        pck = correct_joints.sum(axis=0)/all_joints.sum(axis=0)
+        return pck, pck.mean(), pck.shape[0]
 
     def __call__(self, output: Dict, batch: Dict, opt_output: Optional[Dict] = None):
         """
@@ -296,11 +333,20 @@ class EvaluatorPCK:
         num_samples = 1
         batch_size = pred_keypoints_2d.shape[0]
 
+        right = batch['right'].detach()
+        pred_keypoints_2d[:,:,0] = (2*right[:,None]-1)*pred_keypoints_2d[:,:,0]
+        box_size = batch['box_size'].detach()
+        box_center = batch['box_center'].detach()
+        bbox_expand_factor = batch['bbox_expand_factor'].detach()
+        scale = box_size/bbox_expand_factor
+        bbox_expand_factor = bbox_expand_factor[:,None,None,None]
+        pred_keypoints_2d = pred_keypoints_2d*box_size[:,None,None]+box_center[:,None]
         pred_keypoints_2d = pred_keypoints_2d[:,None,:,:]
-        gt_keypoints_2d = batch['keypoints_2d'][:,None,:,:].repeat(1, num_samples, 1, 1)
-
+        gt_keypoints_2d = batch['orig_keypoints_2d'][:,None,:,:].repeat(1, num_samples, 1, 1)
+        
         self.pred_kp_2d.append(pred_keypoints_2d[:, :, :, :2].detach().cpu().numpy())
         self.gt_conf_2d.append(gt_keypoints_2d[:, :, :, -1].detach().cpu().numpy())
         self.gt_kp_2d.append(gt_keypoints_2d[:, :, :, :2].detach().cpu().numpy())
+        self.scale.append(scale.detach().cpu().numpy())
 
         self.counter += batch_size

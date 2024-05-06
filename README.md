@@ -8,6 +8,12 @@ Code repository for the paper:
 
 ![teaser](assets/teaser.jpg)
 
+## News
+
+- [2024/05] We have released the evaluation pipeline!
+- [2024/05] We have released the HInt dataset annotations! Please check [here](https://github.com/ddshan/hint).
+- [2023/12] Original release!
+
 ## Installation
 First you need to clone the repo:
 ```
@@ -48,6 +54,9 @@ python demo.py \
     --batch_size=48 --side_view --save_mesh --full_frame
 ```
 
+## HInt Dataset
+We have released the annotations for the HInt dataset. Please follow the instructions [here](https://github.com/ddshan/hint)
+
 ## Training
 First, download the training data to `./hamer_training_data/` by running:
 ```
@@ -59,6 +68,16 @@ Then you can start training using the following command:
 python train.py exp_name=hamer data=mix_all experiment=hamer_vit_transformer trainer=gpu launcher=local
 ```
 Checkpoints and logs will be saved to `./logs/`.
+
+## Evaluation
+Download the [evaluation metadata](https://www.dropbox.com/scl/fi/7ip2vnnu355e2kqbyn1bc/hamer_evaluation_data.tar.gz?rlkey=nb4x10uc8mj2qlfq934t5mdlh) to `./hamer_evaluation_data/`. Additionally, download the FreiHAND, HO-3D, and HInt dataset images and update the corresponding paths in  `hamer/configs/datasets_eval.yaml`.
+
+Run evaluation on multiple datasets as follows, results are stored in `results/eval_regression.csv`. 
+```bash
+python eval.py --dataset 'FREIHAND-VAL,HO3D-VAL,NEWDAYS-TEST-ALL,NEWDAYS-TEST-VIS,NEWDAYS-TEST-OCC,EPICK-TEST-ALL,EPICK-TEST-VIS,EPICK-TEST-OCC,EGO4D-TEST-ALL,EGO4D-TEST-VIS,EGO4D-TEST-OCC'
+```
+
+Results for HInt are stored in `results/eval_regression.csv`. For [FreiHAND](https://github.com/lmb-freiburg/freihand) and [HO-3D](https://codalab.lisn.upsaclay.fr/competitions/4318) you get as output a `.json` file that can be used for evaluation using their corresponding evaluation processes.
 
 ## Acknowledgements
 Parts of the code are taken or adapted from the following repos:

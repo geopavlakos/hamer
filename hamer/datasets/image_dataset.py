@@ -2,7 +2,7 @@ import copy
 import os
 import numpy as np
 import torch
-from typing import List
+from typing import Any, Dict, List
 from yacs.config import CfgNode
 import braceexpand
 import cv2
@@ -25,6 +25,161 @@ DEFAULT_STD = 255. * np.array([0.229, 0.224, 0.225])
 DEFAULT_IMG_SIZE = 256
 
 class ImageDataset(Dataset):
+
+    def __init__(self,
+                 cfg: CfgNode,
+                 dataset_file: str,
+                 img_dir: str,
+                 train: bool = True,
+                 rescale_factor = 2,
+                 prune: Dict[str, Any] = {},
+                 **kwargs):
+        """
+        Dataset class used for loading images and corresponding annotations.
+        Args:
+            cfg (CfgNode): Model config file.
+            dataset_file (str): Path to npz file containing dataset info.
+            img_dir (str): Path to image folder.
+            train (bool): Whether it is for training or not (enables data augmentation).
+        """
+        super(ImageDataset, self).__init__()
+        self.train = train
+        self.cfg = cfg
+
+        self.img_size = cfg.MODEL.IMAGE_SIZE
+        self.mean = 255. * np.array(self.cfg.MODEL.IMAGE_MEAN)
+        self.std = 255. * np.array(self.cfg.MODEL.IMAGE_STD)
+        self.rescale_factor = rescale_factor
+
+        self.img_dir = img_dir
+        self.data = np.load(dataset_file, allow_pickle=True)
+
+        self.imgname = self.data['imgname']
+        self.personid = np.zeros(len(self.imgname), dtype=np.int32)
+        self.extra_info = self.data.get('extra_info', [{} for _ in range(len(self.imgname))])
+
+        self.flip_keypoint_permutation = copy.copy(FLIP_KEYPOINT_PERMUTATION)
+
+        num_pose = 3 * (self.cfg.MANO.NUM_HAND_JOINTS + 1)
+
+        # Bounding boxes are assumed to be in the center and scale format
+        self.center = self.data['center']
+        self.scale = self.data['scale'].reshape(len(self.center), -1) / 200.0
+        if self.scale.shape[1] == 1:
+            self.scale = np.tile(self.scale, (1, 2))
+        assert self.scale.shape == (len(self.center), 2)
+
+        try:
+            self.right = self.data['right']
+        except KeyError:
+            self.right = np.ones(len(self.imgname), dtype=np.float32)
+
+        # Get gt MANO parameters, if available
+        try:
+            self.hand_pose = self.data['hand_pose'].astype(np.float32)
+            self.has_hand_pose = self.data['has_hand_pose'].astype(np.float32)
+        except KeyError:
+            self.hand_pose = np.zeros((len(self.imgname), num_pose), dtype=np.float32)
+            self.has_hand_pose = np.zeros(len(self.imgname), dtype=np.float32)
+        try:
+            self.betas = self.data['betas'].astype(np.float32)
+            self.has_betas = self.data['has_betas'].astype(np.float32)
+        except KeyError:
+            self.betas = np.zeros((len(self.imgname), 10), dtype=np.float32)
+            self.has_betas = np.zeros(len(self.imgname), dtype=np.float32)
+
+        # Try to get 2d keypoints, if available
+        try:
+            hand_keypoints_2d = self.data['hand_keypoints_2d']
+        except KeyError:
+            hand_keypoints_2d = np.zeros((len(self.center), 21, 3))
+
+        self.keypoints_2d = hand_keypoints_2d
+
+        # Try to get 3d keypoints, if available
+        try:
+            hand_keypoints_3d = self.data['hand_keypoints_3d'].astype(np.float32)
+        except KeyError:
+            hand_keypoints_3d = np.zeros((len(self.center), 21, 4), dtype=np.float32)
+
+        self.keypoints_3d = hand_keypoints_3d
+
+    def __len__(self) -> int:
+        return len(self.scale)
+
+    def __getitem__(self, idx: int) -> Dict:
+        """
+        Returns an example from the dataset.
+        """
+        try:
+            image_file_rel = self.imgname[idx].decode('utf-8')
+        except AttributeError:
+            image_file_rel = self.imgname[idx]
+        image_file = os.path.join(self.img_dir, image_file_rel)
+        keypoints_2d = self.keypoints_2d[idx].copy()
+        keypoints_3d = self.keypoints_3d[idx].copy()
+
+        center = self.center[idx].copy()
+        center_x = center[0]
+        center_y = center[1]
+        scale = self.scale[idx]
+        right = self.right[idx].copy()
+        bbox_expand_factor = self.rescale_factor
+        bbox_size = bbox_expand_factor*scale.max()*200
+        hand_pose = self.hand_pose[idx].copy().astype(np.float32)
+        betas = self.betas[idx].copy().astype(np.float32)
+
+        has_hand_pose = self.has_hand_pose[idx].copy()
+        has_betas = self.has_betas[idx].copy()
+
+        mano_params = {'global_orient': hand_pose[:3],
+                       'hand_pose': hand_pose[3:],
+                       'betas': betas
+                      }
+
+        has_mano_params = {'global_orient': has_hand_pose,
+                           'hand_pose': has_hand_pose,
+                           'betas': has_betas
+                           }
+
+        mano_params_is_axis_angle = {'global_orient': True,
+                                     'hand_pose': True,
+                                     'betas': False
+                                    }
+
+        augm_config = self.cfg.DATASETS.CONFIG
+        # Crop image and (possibly) perform data augmentation
+        img_patch, keypoints_2d, keypoints_3d, mano_params, has_mano_params, img_size = get_example(image_file,
+                                                                                                    center_x, center_y,
+                                                                                                    bbox_size, bbox_size,
+                                                                                                    keypoints_2d, keypoints_3d,
+                                                                                                    mano_params, has_mano_params,
+                                                                                                    self.flip_keypoint_permutation,
+                                                                                                    self.img_size, self.img_size,
+                                                                                                    self.mean, self.std, self.train, right, augm_config)
+        item = {}
+        # These are the keypoints in the original image coordinates (before cropping)
+        orig_keypoints_2d = self.keypoints_2d[idx].copy()
+
+        item['img'] = img_patch
+        item['keypoints_2d'] = keypoints_2d.astype(np.float32)
+        item['keypoints_3d'] = keypoints_3d.astype(np.float32)
+        item['orig_keypoints_2d'] = orig_keypoints_2d
+        item['box_center'] = self.center[idx].copy()
+        item['box_size'] = bbox_size
+        item['bbox_expand_factor'] = bbox_expand_factor
+        item['img_size'] = 1.0 * img_size[::-1].copy()
+        item['mano_params'] = mano_params
+        item['has_mano_params'] = has_mano_params
+        item['mano_params_is_axis_angle'] = mano_params_is_axis_angle
+        item['imgname'] = image_file
+        item['imgname_rel'] = image_file_rel
+        item['personid'] = int(self.personid[idx])
+        item['extra_info'] = copy.deepcopy(self.extra_info[idx])
+        item['idx'] = idx
+        item['_scale'] = scale
+        item['right'] = self.right[idx].copy()
+        return item
 
     @staticmethod
     def load_tars_as_webdataset(cfg: CfgNode, urls: str|List[str], train: bool,
