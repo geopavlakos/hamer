@@ -47,21 +47,24 @@ def main():
         run_eval(model, model_cfg, dataset_cfg, device, args)
 
 def run_eval(model, model_cfg, dataset_cfg, device, args):
-    # Create dataset and data loader
-    dataset = create_dataset(model_cfg, dataset_cfg, train=False)
-    dataloader = torch.utils.data.DataLoader(dataset, args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers)
 
     # List of metrics to log
     if args.dataset in ['FREIHAND-VAL', 'HO3D-VAL']:
         metrics = None
         preds = ['vertices', 'keypoints_3d']
         pck_thresholds = None
+        rescale_factor = -1
     elif args.dataset in ['NEWDAYS-TEST-ALL', 'NEWDAYS-TEST-VIS', 'NEWDAYS-TEST-OCC',
                           'EPICK-TEST-ALL', 'EPICK-TEST-VIS', 'EPICK-TEST-OCC',
                           'EGO4D-TEST-ALL', 'EGO4D-TEST-VIS', 'EGO4D-TEST-OCC']:
         metrics = ['mode_kpl2']
         preds = None
         pck_thresholds = [0.05, 0.1, 0.15]
+        rescale_factor = 2
+
+    # Create dataset and data loader
+    dataset = create_dataset(model_cfg, dataset_cfg, train=False, rescale_factor=rescale_factor)
+    dataloader = torch.utils.data.DataLoader(dataset, args.batch_size, shuffle=args.shuffle, num_workers=args.num_workers)
 
     # Setup evaluator object
     evaluator = Evaluator(

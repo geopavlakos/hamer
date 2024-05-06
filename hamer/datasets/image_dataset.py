@@ -124,8 +124,13 @@ class ImageDataset(Dataset):
         center_y = center[1]
         scale = self.scale[idx]
         right = self.right[idx].copy()
-        bbox_expand_factor = self.rescale_factor
-        bbox_size = bbox_expand_factor*scale.max()*200
+        if self.rescale_factor == -1:
+            BBOX_SHAPE = self.cfg.MODEL.get('BBOX_SHAPE', None)
+            bbox_size = expand_to_aspect_ratio(scale*200, target_aspect_ratio=BBOX_SHAPE).max()
+            bbox_expand_factor = bbox_size / ((scale*200).max())
+        else:
+            bbox_expand_factor = self.rescale_factor
+            bbox_size = bbox_expand_factor*scale.max()*200
         hand_pose = self.hand_pose[idx].copy().astype(np.float32)
         betas = self.betas[idx].copy().astype(np.float32)
 
