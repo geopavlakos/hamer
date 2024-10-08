@@ -1,5 +1,5 @@
 ARG BASE=nvidia/cuda:12.6.1-base-ubuntu24.04
-FROM ${BASE}
+FROM ${BASE} as hamer
 
 # Install OS dependencies:
 RUN apt-get update && apt-get upgrade -y
@@ -15,26 +15,36 @@ RUN apt-get install -y --no-install-recommends \
 COPY . /hamer
 WORKDIR /hamer
 
-# Create virtual environment:
-RUN python3 -m venv .venv
+# Create virtual environment
+RUN python3 -m venv /opt/venv
+
+# Add virtual environment to PATH
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Activate virtual environment and install dependencies:
 # REVIEW: We need to install/upgrade wheel and setuptools first because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /bin/bash -c "source .venv/bin/activate && pip install --upgrade wheel setuptools"
-RUN --mount=type=cache,target=/root/.cache/pip \
-    /bin/bash -c "source .venv/bin/activate && pip install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cu118"
+    pip install --upgrade wheel setuptools
 
-RUN ls -la /hamer
+# Install torch and torchaudio
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cu118
 
 # REVIEW: Numpy is installed separately because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /bin/bash -c "source .venv/bin/activate && pip install numpy"
+    pip install numpy
 
+# Install project dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /bin/bash -c "source .venv/bin/activate && pip install -e .[all]"
-RUN --mount=type=cache,target=/root/.cache/pip \
-    /bin/bash -c "source .venv/bin/activate && pip install -v -e third-party/ViTPose"
+    pip install -e .[all]
 
-# Acquire the example data:
+# Install ViTPose
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -v -e third-party/ViTPose
+
+# Install gdown
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install gdown
+
+# Acquire the example data
 RUN /bin/bash fetch_demo_data.sh
