@@ -12,8 +12,8 @@ RUN apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install hamer:
-COPY . /hamer
-WORKDIR /hamer
+WORKDIR /app
+COPY . .
 
 # Create virtual environment
 RUN python3 -m venv /opt/venv
@@ -47,4 +47,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install gdown
 
 # Acquire the example data
-RUN /bin/bash fetch_demo_data.sh
+# RUN /bin/bash fetch_demo_data.sh

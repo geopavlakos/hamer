@@ -53,7 +53,19 @@ Besides these files, you also need to download the MANO model. Please visit the 
 If you wish to use HaMeR with Docker, you can use the following command:
 
 ```
-docker compose -f ./docker/docker-compose.yml up
+docker compose -f ./docker/docker-compose.yml up -d
+```
+
+After the image is built successfully, enter the container and run the steps as above:
+
+```
+docker compose -f .\docker\docker-compose.yml exec hamer-dev /bin/bash
+```
+
+Continue with the installation steps:
+
+```bash
+fetch_demo_data.sh
 ```
 
 ## Demo
