@@ -48,6 +48,14 @@ bash fetch_demo_data.sh
 
 Besides these files, you also need to download the MANO model. Please visit the [MANO website](https://mano.is.tue.mpg.de) and register to get access to the downloads section.  We only require the right hand model. You need to put `MANO_RIGHT.pkl` under the `_DATA/data/mano` folder.
 
+### Docker Compose
+
+If you wish to use HaMeR with Docker, you can use the following command:
+
+```
+docker compose -f ./docker/docker-compose.yml up
+```
+
 ## Demo
 ```bash
 python demo.py \
