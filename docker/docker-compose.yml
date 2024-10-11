@@ -1,0 +1,8 @@
+services:
+  hamer-dev:
+    build:
+      context: ../
+      dockerfile: ./docker/hamer-dev.Dockerfile
+    volumes:
+      - ../:/app
+    tty: true
