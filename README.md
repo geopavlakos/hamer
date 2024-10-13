@@ -65,7 +65,7 @@ docker compose -f .\docker\docker-compose.yml exec hamer-dev /bin/bash
 Continue with the installation steps:
 
 ```bash
-fetch_demo_data.sh
+bash fetch_demo_data.sh
 ```
 
 ## Demo
