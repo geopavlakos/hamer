@@ -3,6 +3,7 @@ FROM ${BASE} as hamer
 
 # Install OS dependencies:
 RUN apt-get update && apt-get upgrade -y
+
 RUN apt-get install -y --no-install-recommends \
     gcc g++ \
     make \
@@ -10,6 +11,9 @@ RUN apt-get install -y --no-install-recommends \
     espeak-ng libsndfile1-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install libglfw3-dev libgles2-mesa-dev
 
 # Install hamer:
 WORKDIR /app
