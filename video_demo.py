@@ -10,7 +10,8 @@ from hamer.models import HAMER, download_models, load_hamer, DEFAULT_CHECKPOINT
 from hamer.utils import recursive_to
 from hamer.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
 from hamer.utils.renderer import Renderer, cam_crop_to_full
-
+from hamer.utils.video_frame_processing import get_less_blurry_image
+            
 LIGHT_BLUE=(0.65098039,  0.74117647,  0.85882353)
 
 from vitpose_model import ViTPoseModel
@@ -79,7 +80,8 @@ def main():
     # Iterate over all images in folder
     #pos_frame = cap.get(cv2.cv.CV_CAP_PROP_POS_FRAMES)
     #for img_path in img_paths:
-
+    
+    image_size = (1024,1024)
     video=cv2.VideoWriter('video.avi',cv2.VideoWriter_fourcc(*'XVID'),30,(512,512))
     frame_num = 0
     try:
@@ -88,9 +90,10 @@ def main():
             frame_num+=1
             img_cv2 = frame # cv2.imread(str(img_path))
 
-            img_cv2 = cv2.resize(img_cv2, (512, 512), 
+            img_cv2 = cv2.resize(img_cv2, image_size, 
                    interpolation = cv2.INTER_LINEAR)
-            # Detect humans in image
+            # Detect humans in image\
+
             det_out = detector(img_cv2)
             img = img_cv2.copy()[:, :, ::-1]
 
@@ -219,8 +222,8 @@ def main():
                    interpolation = cv2.INTER_LINEAR)
                 final_frame = cv2.normalize(final_frame, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U)
                 video.write(final_frame)
-                if frame_num == 300:
-                    break
+                #if frame_num == 300:
+                #    break
     except KeyboardInterrupt:
         print("saving")
         cv2.destroyAllWindows()
