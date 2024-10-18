@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install torch and torchaudio
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
+   pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
 
 # REVIEW: Numpy is installed separately because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -50,5 +50,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install gdown
 
+# Install required libraries
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+
+RUN apt-get install libglfw3-dev libgles2-mesa-dev
 # Acquire the example data
-# RUN /bin/bash fetch_demo_data.sh
+# RUN bash fetch_demo_data.sh
+
