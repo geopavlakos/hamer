@@ -91,16 +91,18 @@ def main():
         while cap.isOpened():
             frame_num += 1
             
-            if frame_skip_count <= 4:
-                flag, frame = cap.read()
-                img_cv2 = frame # cv2.imread(str(img_path))
+            #if frame_skip_count <= 4:
+            flag, frame = cap.read()
+            img_cv2 = frame # cv2.imread(str(img_path))
 
-                img_cv2 = cv2.resize(img_cv2, image_size, 
+            img_cv2 = cv2.resize(img_cv2, image_size, 
                            interpolation = cv2.INTER_LINEAR)
                  
-                frames[frame_skip_count] = img_cv2
-                frame_skip_count += 1
-            else:
+            frames[frame_skip_count] = img_cv2
+            frame_skip_count += 1
+                
+            if frame_skip_count == 5:
+                frame_skip_count = 0
                 idx = get_less_blurry_image(frames)
                            
                 #flag, frame = cap.read()
