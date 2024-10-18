@@ -1,4 +1,4 @@
-ARG BASE=nvidia/cuda:12.6.1-base-ubuntu24.04
+ARG BASE=nvidia/cuda:11.8.0-devel-ubuntu22.04
 FROM ${BASE} as hamer
 
 # Install OS dependencies:
@@ -28,8 +28,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install torch and torchaudio
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cu118
-
+    #pip install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+    pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
 # REVIEW: Numpy is installed separately because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install numpy
@@ -46,5 +46,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install gdown
 
+ ## Libgl-so-1 can't open
+#RUN --mount=type=cache,target=/root/.cache/pip \
+#    apt-get update && apt-get install ffmpeg libsm6 libxext6
+
+#RUN --mount=type=cache,target=/root/.cache/pip \
+#    apt-get install libglfw3-dev libgles2-mesa-dev
+
+ 
 # Acquire the example data
 # RUN /bin/bash fetch_demo_data.sh
