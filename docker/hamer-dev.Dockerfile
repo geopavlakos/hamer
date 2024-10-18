@@ -1,4 +1,4 @@
-ARG BASE=nvidia/cuda:12.6.1-base-ubuntu24.04
+ARG BASE=nvidia/cuda:11.8.0-devel-ubuntu22.04
 FROM ${BASE} as hamer
 
 # Install OS dependencies:
@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install torch and torchaudio
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cu118
+    pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
 
 # REVIEW: Numpy is installed separately because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
