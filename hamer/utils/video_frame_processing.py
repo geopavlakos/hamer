@@ -3,8 +3,10 @@ import cv2
 def detect_blur_fft(image, size=60, thresh=10):
     # grab the dimensions of the image and use the dimensions to
     # derive the center (x, y)-coordinates 
-    
+   
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.resize(image, (500,500), interpolation = cv2.INTER_LINEAR)
+                 
     h, w = image.shape
     cX, cY = (int(w / 2.0), int(h / 2.0))
     fft = np.fft.fft2(image)

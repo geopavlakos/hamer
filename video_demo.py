@@ -81,9 +81,10 @@ def main():
     #pos_frame = cap.get(cv2.cv.CV_CAP_PROP_POS_FRAMES)
     #for img_path in img_paths:
     
-    frame_skip = 5
+    frame_skip = 6
     frames = np.array([None]*frame_skip)
-    image_size = (1024,1024)
+    image_size = (512,512)
+    resize = True
     video=cv2.VideoWriter('video.avi',cv2.VideoWriter_fourcc(*'XVID'),30,(512,512))
     frame_num = 0
     frame_skip_count = 0
@@ -94,24 +95,22 @@ def main():
             #if frame_skip_count <= 4:
             flag, frame = cap.read()
             img_cv2 = frame # cv2.imread(str(img_path))
-
-            img_cv2 = cv2.resize(img_cv2, image_size, 
-                           interpolation = cv2.INTER_LINEAR)
-                 
+            
+            if resize:
+                img_cv2 = cv2.resize(img_cv2, image_size,  
+                    interpolation = cv2.INTER_LINEAR)
+                
             frames[frame_skip_count] = img_cv2
             frame_skip_count += 1
                 
-            if frame_skip_count == 5:
+            if frame_skip_count == frame_skip:
                 frame_skip_count = 0
                 idx = get_less_blurry_image(frames)
                            
                 #flag, frame = cap.read()
             
                 img_cv2 = frames[idx] # cv2.imread(str(img_path))
-
-                img_cv2 = cv2.resize(img_cv2, image_size,  
-                       interpolation = cv2.INTER_LINEAR)
-                # Detect humans in image\
+               # Detect humans in image\
 
                 det_out = detector(img_cv2)
                 img = img_cv2.copy()[:, :, ::-1]
@@ -222,7 +221,7 @@ def main():
                             camera_translation = cam_t.copy()
                             tmesh = renderer.vertices_to_trimesh(verts, camera_translation, LIGHT_BLUE, is_right=is_right)
                             tmesh.export(os.path.join(args.out_folder, f'{frame_num}_{person_id}.obj'))
-                for i in range(frame_skip_count):
+                for i in range(frame_skip):
                     # Render front view
                     if args.full_frame and len(all_verts) > 0:
                         misc_args = dict(
@@ -244,6 +243,14 @@ def main():
                         #if frame_num == 300:
                         #    break
     except KeyboardInterrupt:
+
+        print("stop at", frame_num)
+        print("saving")
+        cv2.destroyAllWindows()
+        video.release()
+    except Exception as error:
+        print(error)
+        print("error at", frame_num)
         print("saving")
         cv2.destroyAllWindows()
         video.release()
