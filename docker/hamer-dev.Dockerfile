@@ -1,9 +1,9 @@
-ARG BASE=nvidia/cuda:12.6.1-base-ubuntu24.04
-FROM ${BASE} as hamer
+ARG BASE=nvidia/cuda:12.6.2-devel-ubuntu22.04
+FROM ${BASE} AS hamer
 
 # Install OS dependencies:
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends --fix-missing \
     gcc g++ \
     make \
     python3 python3-dev python3-pip python3-venv python3-wheel \
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install torch and torchvision:
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu118
+    pip install torch==2.2.0 torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cu118
 
 # REVIEW: Numpy is installed separately because otherwise installation fails:
 RUN --mount=type=cache,target=/root/.cache/pip \
