@@ -120,19 +120,14 @@ def main():
                 
                 if args.body_detector == 'yolo':
                     # add more config
-                    det_out = detector(img_cv2, imgsz=yolo_predict_imgsz, conf=yolo_predict_conf)
+                    det_out = detector(img_cv2, imgsz=yolo_predict_imgsz, conf=yolo_predict_conf)[0]
                     img = img_cv2.copy()[:, :, ::-1]
-                    for i in pred_bboxes.size:
-                        tmp = pred_bboxes[i]
-                        pred_bboxes[i][0] = max(0, (tmp[0] - tmp[2]/2)*yolo_predict_imgsz)
-                        pred_bboxes[i][1] = max(0, (tmp[1] - tmp[3]/2)*yolo_predict_imgsz)
-                        pred_bboxes[i][2] = min(yolo_predict_imgsz  - 1, (tmp[0] + tmp[2]/2)*yolo_predict_imgsz)
-                        pred_bboxes[i][3] = min(yolo_predict_imgsz - 1, (tmp[1] + tmp[3]/2)*yolo_predict_imgsz)
 
-
-                    pred_bboxes = det_out.bboxes*yolo_predict_imgsz
-                    pred_scores = det_out.scores
-                    
+                    pred_bboxes = det_out.boxes.xyxy.cpu().numpy()#*(1980/yolo_predict_imgsz) 
+                    pred_scores  = np.ones(pred_bboxes.shape[0])#det_out.probs
+                    #print(det_out)
+                    #print(pred_scores)
+                    print(pred_bboxes)
 
                 else:
                     det_out = detector(img_cv2)
@@ -173,13 +168,13 @@ def main():
 
                     # Rejecting not confident detections
                     keyp = left_hand_keyp
-                    valid = keyp[:,2] > 0.5
+                    valid = keyp[:,2] > 0.4
                     if sum(valid) > 3:
                         bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
                         bboxes.append(bbox)
                         is_right.append(0)
                     keyp = right_hand_keyp
-                    valid = keyp[:,2] > 0.5
+                    valid = keyp[:,2] > 0.4
                     if sum(valid) > 3:
                         bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
                         bboxes.append(bbox)
