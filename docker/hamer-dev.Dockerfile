@@ -50,6 +50,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install gdown
 
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install ultralytics
+
 # Install required libraries
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
