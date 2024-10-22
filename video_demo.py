@@ -18,6 +18,33 @@ from vitpose_model import ViTPoseModel
 
 import json
 from typing import Dict, Optional
+from BIMEF import BIMEF            
+
+
+
+def enhance_img(bgr_img):
+    #bgr_img = cv2.imread(filename, 1)
+    b, g, r = cv2.split(bgr_img)  # get b,g,r
+    rgb_img = cv2.merge([r, g, b])  # switch it to rgb
+
+    #start = time.time()
+    enhanced_rgb_img = BIMEF(rgb_img, mu=0.5)
+    #end = time.time()
+    #run_time = end - start
+    #print('BIMEF run time: ' + str(run_time) + '\n')
+
+    r, g, b = cv2.split(enhanced_rgb_img)
+    enhanced_bgr_img = cv2.merge([b, g, r])
+    return enhanced_bgr_img
+
+def high_pass_filter(image, sigma=1.0):
+    # Apply Gaussian blur
+    blurred = cv2.GaussianBlur(image, (0, 0), sigma)
+    # Subtract the blurred image from the original
+    high_pass = cv2.subtract(image, blurred)
+    # Add the high-pass image back to the original
+    sharpened = cv2.addWeighted(image, 1.0, high_pass, 1.0, 0)
+    return sharpened
 
 def main():
     parser = argparse.ArgumentParser(description='HaMeR demo code')
@@ -60,8 +87,8 @@ def main():
         from detectron2 import model_zoo
         from detectron2.config import get_cfg
         detectron2_cfg = model_zoo.get_config('new_baselines/mask_rcnn_regnety_4gf_dds_FPN_400ep_LSJ.py', trained=True)
-        detectron2_cfg.model.roi_heads.box_predictor.test_score_thresh = 0.5
-        detectron2_cfg.model.roi_heads.box_predictor.test_nms_thresh   = 0.4
+        detectron2_cfg.model.roi_heads.box_predictor.test_score_thresh = 0.25
+        detectron2_cfg.model.roi_heads.box_predictor.test_nms_thresh   = 0.25
         detector       = DefaultPredictor_Lazy(detectron2_cfg)
 
     # keypoint detector
@@ -113,13 +140,18 @@ def main():
                # Detect humans in image\
 
                 det_out = detector(img_cv2)
+                img = enhance_img(img_cv2)
                 img = img_cv2.copy()[:, :, ::-1]
 
                 det_instances = det_out['instances']
                 valid_idx = (det_instances.pred_classes==0) & (det_instances.scores > 0.5)
                 pred_bboxes=det_instances.pred_boxes.tensor[valid_idx].cpu().numpy()
                 pred_scores=det_instances.scores[valid_idx].cpu().numpy()
-
+               
+                print('----')
+                print(pred_bboxes)
+                print(pred_scores)
+                print(pred_scores[:, None])
                 # Detect human keypoints for each person
                 vitposes_out = cpm.predict_pose(
                     img,
@@ -128,7 +160,7 @@ def main():
 
                 bboxes = []
                 is_right = []
-
+                
                 # Use hands based on hand keypoint detections
                 for vitposes in vitposes_out:
                     left_hand_keyp = vitposes['keypoints'][-42:-21]

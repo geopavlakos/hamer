@@ -12,13 +12,38 @@ from hamer.utils import recursive_to
 from hamer.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
 from hamer.utils.renderer import Renderer, cam_crop_to_full
 from hamer.utils.video_frame_processing import get_less_blurry_image
-            
+from BIMEF import BIMEF            
 LIGHT_BLUE=(0.65098039,  0.74117647,  0.85882353)
 
 from vitpose_model import ViTPoseModel
 
 import json
 from typing import Dict, Optional
+
+
+def enhance_img(bgr_img):
+    #bgr_img = cv2.imread(filename, 1)
+    b, g, r = cv2.split(bgr_img)  # get b,g,r
+    rgb_img = cv2.merge([r, g, b])  # switch it to rgb
+
+    #start = time.time()
+    enhanced_rgb_img = BIMEF(rgb_img, mu=0.5)
+    #end = time.time()
+    #run_time = end - start
+    #print('BIMEF run time: ' + str(run_time) + '\n')
+
+    r, g, b = cv2.split(enhanced_rgb_img)
+    enhanced_bgr_img = cv2.merge([b, g, r])
+    return enhanced_bgr_img
+
+def high_pass_filter(image, sigma=1.0):
+    # Apply Gaussian blur
+    blurred = cv2.GaussianBlur(image, (0, 0), sigma)
+    # Subtract the blurred image from the original
+    high_pass = cv2.subtract(image, blurred)
+    # Add the high-pass image back to the original
+    sharpened = cv2.addWeighted(image, 1.0, high_pass, 1.0, 0)
+    return sharpened
 
 def main():
     parser = argparse.ArgumentParser(description='HaMeR demo code')
@@ -67,7 +92,7 @@ def main():
         detector       = DefaultPredictor_Lazy(detectron2_cfg)
     elif args.body_detector == 'yolo':
         detector = YOLO(args.yolo_model_path)
-        yolo_predict_conf = 0.25
+        yolo_predict_conf = 0.35
         yolo_predict_imgsz=640
         # implement yolo model config here 
     # keypoint detector
@@ -121,6 +146,9 @@ def main():
                 if args.body_detector == 'yolo':
                     # add more config
                     det_out = detector(img_cv2, imgsz=yolo_predict_imgsz, conf=yolo_predict_conf)[0]
+                    img_cv2 = high_pass_filter(img_cv2) #cv2.fastNlMeanDenoisingColored(img_cv2, None, 10, 10, 7, 21)
+                    img_cv2 = enhance_img(img_cv2)
+
                     img = img_cv2.copy()[:, :, ::-1]
 
                     pred_bboxes = det_out.boxes.xyxy.cpu().numpy()#*(1980/yolo_predict_imgsz) 
@@ -133,6 +161,7 @@ def main():
                     det_out = detector(img_cv2)
                 
                     print(det_out)
+                    img_cv2 = enhance_img(img_cv2) #high_pass_filter(img_cv2) #cv2.fastNlMeanDenoisingColored(img_cv2, None, 10, 10, 7, 21)
                     img = img_cv2.copy()[:, :, ::-1]
 
                     det_instances = det_out['instances']
