@@ -15,7 +15,7 @@ RUN apt-get install -y --no-install-recommends --fix-missing \
     libglfw3-dev libgles2-mesa-dev \
     && rm -rf /var/lib/apt/lists/*
 
-
+# Install hamer:
 WORKDIR /app
 
 # Create virtual environment:
