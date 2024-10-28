@@ -1,25 +1,24 @@
-ARG BASE=nvidia/cuda:11.8.0-devel-ubuntu22.04
-FROM ${BASE} as hamer
+ARG BASE=nvidia/cuda:12.6.2-devel-ubuntu22.04
+FROM ${BASE} AS hamer
 
 # Install OS dependencies:
 RUN apt-get update && apt-get upgrade -y
-
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends --fix-missing \
     gcc g++ \
     make \
     python3 python3-dev python3-pip python3-venv python3-wheel \
     espeak-ng libsndfile1-dev \
     git \
+    wget \
+    ffmpeg \
+    libsm6 libxext6 \
+    libglfw3-dev libgles2-mesa-dev \
     && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
-RUN apt-get install libglfw3-dev libgles2-mesa-dev -y
 
 # Install hamer:
 WORKDIR /app
-COPY . .
 
-# Create virtual environment
+# Create virtual environment:
 RUN python3 -m venv /opt/venv
 
 # Add virtual environment to PATH
@@ -30,7 +29,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade wheel setuptools
 
-# Install torch and torchaudio
+# Install torch and torchvision:
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.2.0 torchvision==0.17.0 --index-url https://download.pytorch.org/whl/cu118
 
@@ -38,17 +37,17 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install numpy
 
-# Install project dependencies
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -e .[all]
-
-# Install ViTPose
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -v -e third-party/ViTPose
-
-# Install gdown
+# Install gdown (used for fetching scripts):
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install gdown
 
-# Acquire the example data
-# RUN /bin/bash fetch_demo_data.sh
+# Install third-party dependencies ViTPose:
+COPY third-party/ third-party/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -v -e third-party/ViTPose
+
+# Install project dependencies:
+COPY . .
+# Install hamer:
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -e .[all]
