@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--side_view', dest='side_view', action='store_true', default=False, help='If set, render side view also')
     parser.add_argument('--full_frame', dest='full_frame', action='store_true', default=True, help='If set, render all people together also')
     parser.add_argument('--save_mesh', dest='save_mesh', action='store_true', default=False, help='If set, save meshes to disk also')
-    parser.add_argument('--3d_keypoints', dest='3d_keypoints', action='store_true', default=False, help='If set, save keypoints to disk alongside the mesh.')
+    parser.add_argument('--save_keypoints', dest='save_keypoints', action='store_true', default=False, help='If set, save keypoints to disk alongside the mesh.')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size for inference/fitting')
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety'], help='Using regnety improves runtime and reduces memory')
@@ -187,7 +187,7 @@ def main():
                     tmesh = renderer.vertices_to_trimesh(verts, camera_translation, LIGHT_BLUE, is_right=is_right)
                     tmesh.export(os.path.join(args.out_folder, f'{img_fn}_{person_id}.obj'))
 
-                if args.3d_keypoints:
+                if args.save_keypoints:
                     inferred_keypoints = pred_cam_t_full + out['pred_keypoints_3d']
                     np.save(os.path.join(args.out_folder, f'{img_fn}_{person_id}_3dkeypoints.npy'), inferred_keypoints)
 
