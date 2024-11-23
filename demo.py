@@ -188,8 +188,23 @@ def main():
                     tmesh.export(os.path.join(args.out_folder, f'{img_fn}_{person_id}.obj'))
 
                 if args.save_keypoints:
-                    inferred_keypoints = pred_cam_t_full + out['pred_keypoints_3d']
-                    np.save(os.path.join(args.out_folder, f'{img_fn}_{person_id}_3dkeypoints.npy'), inferred_keypoints)
+                    pred_keypoints_3d = out['pred_keypoints_3d'].detach().cpu().numpy().copy()
+
+                    # For each element in the pred_keypoints_3d, we need to add
+                    # the corresponding camera translation to get the 3D keypoints in world coordinates:
+                    if not len(pred_cam_t_full) == len(pred_keypoints_3d):
+                        raise ValueError('Number of cameras and keypoints do not match')
+
+                    # Iterating over all of the samples in the batch:
+                    for i in range(len(pred_keypoints_3d)):
+                        batch_element_keypoints = pred_keypoints_3d[i]
+                        batch_element_cam_t = pred_cam_t_full[i]
+
+                        for keypoint_idx in range(len(batch_element_keypoints)):
+                            # Adding the camera translation to the keypoints:
+                            batch_element_keypoints[keypoint_idx] += batch_element_cam_t
+
+                    np.save(os.path.join(args.out_folder, f'{img_fn}_{person_id}_3dkeypoints.npy'), pred_keypoints_3d)
 
         # Render front view
         if args.full_frame and len(all_verts) > 0:
