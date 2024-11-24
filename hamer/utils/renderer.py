@@ -9,7 +9,7 @@ import cv2
 from yacs.config import CfgNode
 from typing import List, Optional
 
-def cam_crop_to_full(cam_bbox, box_center, box_size, img_size, focal_length=5000.):
+def cam_crop_to_full(cam_bbox, box_center, box_size, img_size, focal_length=5000.) -> torch.Tensor:
     # Convert cam_bbox to full image
     img_w, img_h = img_size[:, 0], img_size[:, 1]
     cx, cy, b = box_center[:, 0], box_center[:, 1], box_size
