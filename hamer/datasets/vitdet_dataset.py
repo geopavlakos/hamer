@@ -62,10 +62,10 @@ class ViTDetDataset(torch.utils.data.Dataset):
         # 3. generate image patch
         # if use_skimage_antialias:
         cvimg = self.img_cv2.copy()
-        if True:
+        if False:
             # Blur image to avoid aliasing artifacts
             downsampling_factor = ((bbox_size*1.0) / patch_width)
-            print(f'{downsampling_factor=}')
+            #print(f'{downsampling_factor=}')
             downsampling_factor = downsampling_factor / 2.0
             if downsampling_factor > 1.1:
                 cvimg  = gaussian(cvimg, sigma=(downsampling_factor-1)/2, channel_axis=2, preserve_range=True)
