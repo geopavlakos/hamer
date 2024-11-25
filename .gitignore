@@ -15,6 +15,9 @@ token_channel.csv
 /hamer_training_data/
 /outputs/
 
+mano_v1_2/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
