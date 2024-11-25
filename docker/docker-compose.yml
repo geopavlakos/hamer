@@ -6,7 +6,7 @@ services:
     volumes:
       - ../:/app
     tty: true
-   deploy:
+    deploy:
       resources:
         reservations:
           devices:
