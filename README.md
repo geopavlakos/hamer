@@ -113,6 +113,9 @@ Parts of the code are taken or adapted from the following repos:
 
 Additionally, we thank [StabilityAI](https://stability.ai/) for a generous compute grant that enabled this work.
 
+## Open-Source Contributions
+- [Wentao Hu](https://vincenthu19.github.io/) integrated the hand parameters predicted by HaMeR into SMPL-X - [Mano2Smpl-X](https://github.com/VincentHu19/Mano2Smpl-X)
+
 ## Citing
 If you find this code useful for your research, please consider citing the following paper:
 
