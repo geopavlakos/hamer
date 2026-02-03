@@ -1,3 +1,8 @@
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+import time
 from pathlib import Path
 import torch
 import argparse
@@ -87,6 +92,7 @@ def main():
     parser.add_argument('--full_frame', dest='full_frame', action='store_true', default=True, help='If set, render all people together also')
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--save_crop', dest='save_crop', action='store_true', default=False, help='If set, saves cropped image with hand')
+    parser.add_argument('--show_scatter', dest='show_scatter', action='store_true', default=False, help='if true, show a scatterplot with matplotlib.')
 
     args = parser.parse_args()
 
@@ -121,6 +127,7 @@ def main():
     def detect_hands(img_cv2):
         result_img = img_cv2
         boxes, right = get_bounding_boxes(img_cv2)
+        points = []
         
         if len(right) > 0: # check if any hands detected.
             # Run reconstruction on all detected hands
@@ -177,6 +184,11 @@ def main():
                     all_verts.append(verts)
                     all_cam_t.append(cam_t)
                     all_right.append(is_right)
+                    #print(out['pred_keypoints_3d'][n])
+                    #print(out['pred_cam_t'][n])
+                    points.append(torch.tensor(cam_t).to(device))
+                    points.append(out['pred_keypoints_3d'][n])
+                    
 
             # Render front view
             if args.full_frame and len(all_verts) > 0:
@@ -195,9 +207,29 @@ def main():
                 
                 cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_all.jpg'), result_img)
 
-        return result_img
+        x = []
+        y = []
+        z = []
+        if len(points) > 0:
+            points = torch.vstack(points).detach().cpu().numpy()
+            x = points[:, 0]
+            y = points[:, 1]
+            z = points[:, 2]
+        return result_img, (x,y,z)
         
         
+    if args.show_scatter:
+        # ---- Set up 3D plot ----
+        plt.ion()  # interactive mode
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Initial empty scatter
+        scatter = ax.scatter([], [], [])
+        ax.set_xlim(-10, 10)
+        ax.set_ylim(-10, 10)
+        ax.set_zlim(-10, 10)
+
     while True:
         ret, img_cv2 = cam.read()
 
@@ -205,10 +237,20 @@ def main():
             print("Failed to grab frame")
             break
 
+        if not plt.get_fignums():
+            # window was closed.
+            break
+
         # Display the result img if available.
         if future is not None and future.done():
-            result_img = future.result()
+            result_img, points = future.result()
             cv2.imshow('Camera', result_img)
+            
+            if args.show_scatter:
+                x, y, z = points
+                scatter._offsets3d = (x,y,z)
+                plt.draw()
+                plt.pause(0.01)
 
         # Schedule hand detection on the current frame if it is not running.
         if future is None or future.done():
@@ -220,6 +262,7 @@ def main():
     
     cam.release()
     cv2.destroyAllWindows()
+    plt.ioff()
     
 if __name__ == '__main__':
     main()
