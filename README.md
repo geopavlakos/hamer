@@ -10,6 +10,7 @@ Code repository for the paper:
 
 ## News
 
+- [2026/02] Check out our [new work](https://gkarv.github.io/hand-texture-module/) using learned texture priors to improve HaMeR.
 - [2024/06] HaMeR received the 2nd place award in the Ego-Pose Hands task of the Ego-Exo4D Challenge! Please check the [validation report](https://www.cs.utexas.edu/~pavlakos/hamer/resources/egoexo4d_challenge.pdf).
 - [2024/05] We have released the evaluation pipeline!
 - [2024/05] We have released the HInt dataset annotations! Please check [here](https://github.com/ddshan/hint).
