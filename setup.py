@@ -16,9 +16,9 @@ setup(
         'torch',
         'torchvision',
         'yacs',
-        'detectron2 @ git+https://github.com/facebookresearch/detectron2',
-        'chumpy @ git+https://github.com/mattloper/chumpy',
-        'mmcv==1.3.9',
+        # 'detectron2 @ git+https://github.com/facebookresearch/detectron2',  # 已手动安装
+        # 'chumpy @ git+https://github.com/mattloper/chumpy',  # 已手动安装
+        # 'mmcv==1.3.9',  # 已手动安装
         'timm',
         'einops',
         'xtcocotools',

@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import os
+import sys
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from mmpose.apis import inference_top_down_pose_model, init_pose_model, process_mmdet_results, vis_pose_result
-
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
-# project root directory
-ROOT_DIR = "./"
-VIT_DIR = os.path.join(ROOT_DIR, "third-party/ViTPose")
+# Resolve paths from this file instead of the current working directory.
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+VIT_DIR = os.path.join(ROOT_DIR, "third-party", "ViTPose")
+
+# Prefer the ViTPose submodule's bundled mmpose implementation. This avoids
+# accidentally importing the separately installed upstream mmpose package, which
+# does not register the ViTPose-specific ``ViT`` backbone.
+if VIT_DIR not in sys.path:
+    sys.path.insert(0, VIT_DIR)
+
+from mmpose.apis import inference_top_down_pose_model, init_pose_model, process_mmdet_results, vis_pose_result
 
 class ViTPoseModel(object):
     MODEL_DICT = {
@@ -34,6 +41,15 @@ class ViTPoseModel(object):
     def _load_model(self, name: str) -> nn.Module:
         dic = self.MODEL_DICT[name]
         ckpt_path = dic['model']
+        if not os.path.isdir(VIT_DIR):
+            raise FileNotFoundError(
+                f"ViTPose submodule not found: {VIT_DIR}. "
+                "Run `git submodule update --init --recursive` inside third_party/hamer."
+            )
+        if not os.path.isfile(dic['config']):
+            raise FileNotFoundError(f"ViTPose config not found: {dic['config']}")
+        if not os.path.isfile(ckpt_path):
+            raise FileNotFoundError(f"ViTPose checkpoint not found: {ckpt_path}")
         model = init_pose_model(dic['config'], ckpt_path, device=self.device)
         return model
 
