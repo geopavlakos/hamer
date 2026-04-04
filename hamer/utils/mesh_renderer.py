@@ -1,6 +1,7 @@
 import os
-if 'PYOPENGL_PLATFORM' not in os.environ:
-    os.environ['PYOPENGL_PLATFORM'] = 'egl'
+# HaMeR uses EGL for headless rendering in TouchAnything.
+# Force it here to avoid inheriting an incompatible OSMesa setting.
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
 import torch
 from torchvision.utils import make_grid
 import numpy as np

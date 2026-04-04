@@ -1,9 +1,9 @@
 """
-优化版 TouchAnything 数据集处理脚本
-- 批量推理优化（一次处理多帧）
-- 多进程并行处理
-- 视频可视化（绘制手部骨架）
-- 生成 hamer_hands.json
+Optimized TouchAnything dataset processing script.
+- Batched inference optimization (process multiple frames at once)
+- Multiprocess parallel processing
+- Video visualization (draw hand skeleton)
+- Generate hamer_hands.json
 """
 from pathlib import Path
 import torch
@@ -25,7 +25,7 @@ from hamer.utils.renderer import cam_crop_to_full
 from vitpose_model import ViTPoseModel
 
 
-# ── 手部骨架连接关系 ──
+# Hand skeleton connectivity
 HAND_EDGES = [
     (0, 1), (1, 2), (2, 3), (3, 4),        # thumb
     (0, 5), (5, 6), (6, 7), (7, 8),        # index
@@ -36,7 +36,7 @@ HAND_EDGES = [
 
 
 def project_points(points_3d, focal_length, img_w, img_h):
-    """3D 点投影到 2D 图像坐标"""
+    """Project 3D points to 2D image coordinates."""
     x = points_3d[:, 0]
     y = points_3d[:, 1]
     z = points_3d[:, 2]
@@ -49,23 +49,23 @@ def project_points(points_3d, focal_length, img_w, img_h):
 
 def detect_outliers_and_smooth(results, max_displacement=0.5):
     """
-    检测异常跳变并平滑处理
+    Detect abrupt outliers and smooth them.
     
-    策略：
-    1. 计算相邻帧之间的位移
-    2. 如果位移超过阈值，标记为异常
-    3. 异常帧使用前一帧的结果替代
+    Strategy:
+    1. Compute displacement between adjacent frames
+    2. Mark as outlier if displacement exceeds threshold
+    3. Replace outlier frame with previous frame result
     
     Args:
-        results: 帧结果列表
-        max_displacement: 最大允许位移（米），默认0.5米
+        results: List of per-frame results
+        max_displacement: Maximum allowed displacement (meters), default 0.5m
     """
     if not results or len(results) < 2:
         return results
     
     n_frames = len(results)
     
-    # 分别处理左手和右手
+    # Process left and right hands separately
     for hand_key in ['left_pos', 'right_pos']:
         outlier_count = 0
         
@@ -73,59 +73,59 @@ def detect_outliers_and_smooth(results, max_displacement=0.5):
             curr_pos = results[i][hand_key]
             prev_pos = results[i-1][hand_key]
             
-            # 如果当前帧或前一帧没有检测结果，跳过
+            # Skip if current or previous frame has no detection
             if not curr_pos or not prev_pos:
                 continue
             
-            # 计算手腕位置的位移（第0个关节点）
+            # Compute wrist displacement (joint index 0)
             curr_wrist = np.array(curr_pos[0])
             prev_wrist = np.array(prev_pos[0])
             displacement = np.linalg.norm(curr_wrist - prev_wrist)
             
-            # 如果位移过大，标记为异常并使用前一帧结果
+            # If displacement is too large, mark as outlier and use previous frame
             if displacement > max_displacement:
                 results[i][hand_key] = prev_pos
                 outlier_count += 1
         
         if outlier_count > 0:
-            print(f"[INFO] {hand_key}: 检测到 {outlier_count} 个异常跳变帧，已平滑处理")
+            print(f"[INFO] {hand_key}: detected {outlier_count} outlier jump frames, smoothing applied")
     
     return results
 
 
 def interpolate_missing_hands(results):
     """
-    插值和填充缺失的手部姿态
+    Interpolate and fill missing hand poses.
     
-    策略：
-    1. 线性插值：如果前后都有检测结果，使用线性插值
-    2. 前向填充：如果只有前面有检测结果，使用前一帧的结果
-    3. 后向填充：如果只有后面有检测结果，使用后一帧的结果
+    Strategy:
+    1. Linear interpolation if both neighboring detections exist
+    2. Forward fill if only previous detection exists
+    3. Backward fill if only next detection exists
     """
     if not results:
         return results
     
     n_frames = len(results)
     
-    # 分别处理左手和右手
+    # Process left and right hands separately
     for hand_key in ['left_pos', 'right_pos']:
-        # 找到所有有效帧的索引
+        # Find indices of valid frames
         valid_indices = [i for i, r in enumerate(results) if r[hand_key]]
         
         if not valid_indices:
             continue
         
-        # 统计信息
+        # Stats
         missing_count = n_frames - len(valid_indices)
         if missing_count > 0:
-            print(f"[INFO] {hand_key}: 检测到 {len(valid_indices)}/{n_frames} 帧，缺失 {missing_count} 帧")
+            print(f"[INFO] {hand_key}: detected {len(valid_indices)}/{n_frames} frames, missing {missing_count} frames")
         
-        # 处理缺失帧
+        # Process missing frames
         for i in range(n_frames):
             if results[i][hand_key]:
                 continue
             
-            # 找到最近的前后有效帧
+            # Find nearest previous/next valid frames
             prev_idx = None
             next_idx = None
             
@@ -136,9 +136,9 @@ def interpolate_missing_hands(results):
                     next_idx = vi
                     break
             
-            # 插值或填充
+            # Interpolate or fill
             if prev_idx is not None and next_idx is not None:
-                # 线性插值
+                # Linear interpolation
                 alpha = (i - prev_idx) / (next_idx - prev_idx)
                 prev_pos = np.array(results[prev_idx][hand_key])
                 next_pos = np.array(results[next_idx][hand_key])
@@ -146,18 +146,18 @@ def interpolate_missing_hands(results):
                 results[i][hand_key] = interpolated_pos.tolist()
                 
             elif prev_idx is not None:
-                # 前向填充
+                # Forward fill
                 results[i][hand_key] = results[prev_idx][hand_key]
                 
             elif next_idx is not None:
-                # 后向填充
+                # Backward fill
                 results[i][hand_key] = results[next_idx][hand_key]
     
     return results
 
 
 def load_jsonl_results(json_path):
-    """读取按行存储的 JSON 结果"""
+    """Load line-delimited JSON results."""
     results = []
     with open(json_path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -169,7 +169,7 @@ def load_jsonl_results(json_path):
 
 
 def save_jsonl_results(json_path, results):
-    """保存按行存储的 JSON 结果"""
+    """Save line-delimited JSON results."""
     with open(json_path, 'w', encoding='utf-8') as f:
         for item in results:
             json.dump(item, f, ensure_ascii=False)
@@ -178,14 +178,14 @@ def save_jsonl_results(json_path, results):
 
 def fill_missing_hands_with_nearest(results):
     """
-    用时间上最近的有效帧填补缺失手部结果。
+    Fill missing hand results using temporally nearest valid frames.
 
-    处理策略分两步：
-    1. 如果某一整帧 left_pos 和 right_pos 都为空，则直接复制最近的有效帧结果
-    2. 如果只是单手为空，则再按手分别用最近的有效帧补齐
+    Two-step strategy:
+    1. If both left_pos and right_pos are empty in a frame, copy from nearest valid frame
+    2. If only one hand is missing, fill per-hand from nearest valid frame
 
-    如果前后两侧都有有效帧，则选择帧距离更近的那一侧；
-    距离相同时优先使用前一帧。
+    If both previous and next valid frames exist, choose the closer one;
+    if equally distant, prefer the previous frame.
     """
     if not results:
         return results, {}
@@ -271,46 +271,46 @@ def fill_missing_hands_with_nearest(results):
 
 def repair_existing_hamer_json(json_path):
     """
-    检查现有 hamer_hands.json 是否存在缺失手部结果，若有则就地修复。
+    Check existing hamer_hands.json for missing hand results and repair in place if needed.
 
     Returns:
-        bool: True 表示已成功检查/修复；False 表示读取失败，需要重新处理视频。
+        bool: True means check/repair succeeded; False means read failed and video should be reprocessed.
     """
     try:
         results = load_jsonl_results(json_path)
     except Exception as exc:
-        print(f"[WARN] 读取现有 JSON 失败，准备重新处理视频: {json_path}, error={exc}")
+        print(f"[WARN] Failed to read existing JSON, will reprocess video: {json_path}, error={exc}")
         return False
 
     results, fill_stats = fill_missing_hands_with_nearest(results)
     total_filled = sum(fill_stats.values())
 
     if total_filled == 0:
-        print(f"[INFO] 现有 JSON 无缺失手部帧，保留原结果: {json_path}")
+        print(f"[INFO] Existing JSON has no missing hand frames, keeping original result: {json_path}")
         return True
 
     save_jsonl_results(json_path, results)
     print(
-        f"[INFO] 已修复现有 JSON: {json_path} "
-        f"(整帧替代 {fill_stats.get('frame_level', 0)} 帧, "
-        f"left_pos 补 {fill_stats.get('left_pos', 0)} 帧, "
-        f"right_pos 补 {fill_stats.get('right_pos', 0)} 帧)"
+        f"[INFO] Repaired existing JSON: {json_path} "
+        f"(full-frame replacement: {fill_stats.get('frame_level', 0)} frames, "
+        f"left_pos filled: {fill_stats.get('left_pos', 0)} frames, "
+        f"right_pos filled: {fill_stats.get('right_pos', 0)} frames)"
     )
     return True
 
 
 def draw_one_hand(canvas, joints_2d, is_right, edges=HAND_EDGES):
     """
-    绘制单只手的骨架
-    右手：蓝线 + 绿点
-    左手：红线 + 黄点
+    Draw skeleton for one hand.
+    Right hand: blue lines + green points
+    Left hand: red lines + yellow points
     """
     if is_right:
-        line_color = (255, 0, 0)    # 蓝
-        point_color = (0, 255, 0)   # 绿
+        line_color = (255, 0, 0)    # Blue
+        point_color = (0, 255, 0)   # Green
     else:
-        line_color = (0, 0, 255)    # 红
-        point_color = (0, 255, 255) # 黄
+        line_color = (0, 0, 255)    # Red
+        point_color = (0, 255, 255) # Yellow
 
     for i, j in edges:
         pt1 = tuple(np.round(joints_2d[i]).astype(int))
@@ -325,7 +325,7 @@ def draw_one_hand(canvas, joints_2d, is_right, edges=HAND_EDGES):
 
 
 def detect_both_hands_boxes(img_cv2, detector, cpm):
-    """检测图像中的左右手边界框"""
+    """Detect left/right hand bounding boxes in an image."""
     det_out = detector(img_cv2)
     img_rgb = img_cv2[:, :, ::-1].copy()
 
@@ -349,7 +349,7 @@ def detect_both_hands_boxes(img_cv2, detector, cpm):
     for vitposes in vitposes_out:
         keypoints = vitposes['keypoints']
 
-        # 左手 21 个点
+        # Left hand 21 keypoints
         left_hand_keyp = keypoints[-42:-21]
         left_valid = left_hand_keyp[:, 2] > 0.5
         if np.sum(left_valid) > 3:
@@ -362,7 +362,7 @@ def detect_both_hands_boxes(img_cv2, detector, cpm):
             bboxes.append(left_bbox)
             is_right_list.append(0)
 
-        # 右手 21 个点
+        # Right hand 21 keypoints
         right_hand_keyp = keypoints[-21:]
         right_valid = right_hand_keyp[:, 2] > 0.5
         if np.sum(right_valid) > 3:
@@ -392,18 +392,18 @@ def process_frames_batch(
     rescale_factor=2.0
 ):
     """
-    批量处理多帧，返回每帧的结果
+    Process multiple frames in batch and return per-frame results.
     
     Returns:
-        results: List[dict] - 每帧的结果
+        results: List[dict] - result for each frame
             {
                 'left_pos': [[x,y,z], ...] or None,
                 'right_pos': [[x,y,z], ...] or None,
-                'vis_frame': np.ndarray - 可视化帧,
-                'focal_length': float - 焦距
+                'vis_frame': np.ndarray - visualization frame,
+                'focal_length': float - focal length
             }
     """
-    # 批量检测所有帧的手部边界框
+    # Detect hand boxes for all frames in batch
     all_boxes = []
     all_rights = []
     for frame in frames:
@@ -419,7 +419,7 @@ def process_frames_batch(
         left_pos = None
         right_pos = None
         
-        focal_length_value = max(img_w, img_h)  # 默认焦距
+        focal_length_value = max(img_w, img_h)  # Default focal length
         
         if boxes is not None:
             dataset = ViTDetDataset(
@@ -434,14 +434,14 @@ def process_frames_batch(
                 dataset,
                 batch_size=batch_size,
                 shuffle=False,
-                num_workers=4,  # 并行数据加载
-                pin_memory=True  # 加速GPU传输
+                num_workers=4,  # Parallel data loading
+                pin_memory=True  # Speed up GPU transfer
             )
 
             for batch in dataloader:
                 batch = recursive_to(batch, device)
 
-                # 混合精度推理加速
+                # Mixed precision inference for speed
                 with torch.no_grad(), torch.cuda.amp.autocast():
                     out = model(batch)
 
@@ -472,19 +472,19 @@ def process_frames_batch(
                     joints_3d = pred_joints_3d[n].detach().cpu().numpy()
                     is_right_hand = int(batch['right'][n].detach().cpu().item())
                     
-                    # 镜像处理
+                    # Mirror correction
                     joints_3d[:, 0] = (2 * is_right_hand - 1) * joints_3d[:, 0]
                     
-                    # 转换到相机坐标系
+                    # Convert to camera coordinates
                     joints_3d_cam = joints_3d + pred_cam_t_full[n][None, :]
                     
-                    # 投影到 2D 用于可视化
+                    # Project to 2D for visualization
                     if scaled_focal_length.ndim == 0:
                         current_focal_length = float(scaled_focal_length.detach().cpu().item())
                     else:
                         current_focal_length = float(scaled_focal_length[n].detach().cpu().item())
                     
-                    # 更新焦距（使用实际计算的焦距）
+                    # Update focal length (use computed value)
                     focal_length_value = current_focal_length
                     
                     joints_2d = project_points(
@@ -494,7 +494,7 @@ def process_frames_batch(
                         img_h=img_h
                     )
                     
-                    # 绘制骨架
+                    # Draw skeleton
                     vis_frame = draw_one_hand(vis_frame, joints_2d, is_right_hand)
 
                     if is_right_hand:
@@ -526,18 +526,18 @@ def process_video_sequence(
     rescale_factor=2.0,
     max_frames=None,
     max_displacement=0.5,
-    resize_scale=0.5  # 新增: 图像缩放比例,0.5=缩小一半,加速2-3倍
+    resize_scale=0.5  # Added: image resize ratio, 0.5 = half size, ~2-3x speedup
 ):
     """
-    处理视频序列，生成 hamer_hands.json 和可视化视频
+    Process a video sequence and generate hamer_hands.json plus a visualization video.
     
     Args:
-        batch_size: HaMeR 模型推理的 batch size
-        frame_batch_size: 一次读取并处理的帧数
+        batch_size: HaMeR model inference batch size
+        frame_batch_size: Number of frames read/processed per iteration
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        print(f"[ERROR] 无法打开视频: {video_path}")
+        print(f"[ERROR] Failed to open video: {video_path}")
         return False
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -548,12 +548,12 @@ def process_video_sequence(
     if max_frames is not None:
         total_frames = min(total_frames, max_frames)
 
-    print(f"[INFO] 处理视频: {video_path}")
-    print(f"[INFO] FPS: {fps:.2f}, 总帧数: {total_frames}, 分辨率: {width}x{height}")
+    print(f"[INFO] Processing video: {video_path}")
+    print(f"[INFO] FPS: {fps:.2f}, Total frames: {total_frames}, Resolution: {width}x{height}")
 
-    # 稍后创建视频写入器（在后处理之后）
+    # Create video writer later (after post-processing)
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
-    # 优先尝试 H.264；若当前 OpenCV/FFmpeg 不支持，再回退到更通用的 mp4v
+    # Try H.264 first; fall back to more generic mp4v if unsupported
     preferred_codecs = ['avc1', 'mp4v']
 
     results = []
@@ -564,7 +564,7 @@ def process_video_sequence(
     
     with tqdm(total=total_frames, desc="Processing frames") as pbar:
         while True:
-            # 批量读取帧
+            # Read frames in batch
             t0 = time.time()
             frames = []
             frame_indices = []
@@ -577,8 +577,8 @@ def process_video_sequence(
                 if not ret:
                     break
                 
-                # 可选: 跳帧处理 (frame_skip=2 表示每2帧处理1帧,速度翻倍)
-                # frame_skip = 1  # 不跳帧
+                # Optional frame skipping (frame_skip=2 means process 1 out of every 2 frames)
+                # frame_skip = 1  # No frame skipping
                 # if frame_index % frame_skip != 0:
                 #     frame_index += 1
                 #     continue
@@ -592,7 +592,7 @@ def process_video_sequence(
             
             time_stats['read'] += time.time() - t0
             
-            # 批量处理
+            # Batch processing
             t1 = time.time()
             batch_results = process_frames_batch(
                 frames,
@@ -606,7 +606,7 @@ def process_video_sequence(
             )
             time_stats['inference'] += time.time() - t1
             
-            # 保存结果和可视化帧
+            # Save results and visualization frames
             for idx, (frame_idx, result) in enumerate(zip(frame_indices, batch_results)):
                 timestamp = frame_idx / fps if fps > 0 else frame_idx * 0.033
                 
@@ -616,7 +616,7 @@ def process_video_sequence(
                     "left_pos": result['left_pos'],
                     "right_pos": result['right_pos'],
                     "aligned_to_vive": False,
-                    "vis_frame": result['vis_frame']  # 保存可视化帧
+                    "vis_frame": result['vis_frame']  # Save visualization frame
                 }
                 
                 results.append(frame_data)
@@ -625,19 +625,19 @@ def process_video_sequence(
 
     cap.release()
 
-    # 后处理：用最近的有效帧填补空手部结果
+    # Post-processing: fill missing hand results with nearest valid frames
     results, fill_stats = fill_missing_hands_with_nearest(results)
     total_filled = sum(fill_stats.values())
     if total_filled > 0:
         print(
-            "\n[INFO] 新生成结果已补全缺失手部帧: "
-            f"整帧替代 {fill_stats.get('frame_level', 0)} 帧, "
-            f"left_pos 补 {fill_stats.get('left_pos', 0)} 帧, "
-            f"right_pos 补 {fill_stats.get('right_pos', 0)} 帧"
+            "\n[INFO] Filled missing hand frames in newly generated results: "
+            f"full-frame replacement: {fill_stats.get('frame_level', 0)} frames, "
+            f"left_pos filled: {fill_stats.get('left_pos', 0)} frames, "
+            f"right_pos filled: {fill_stats.get('right_pos', 0)} frames"
         )
 
-    # 写入可视化视频（使用第一次生成的vis_frame）
-    print("\n[INFO] 写入可视化视频...")
+    # Write visualization video (using the first generated vis_frame)
+    print("\n[INFO] Writing visualization video...")
     t_write_start = time.time()
     video_writer = None
     selected_codec = None
@@ -656,63 +656,63 @@ def process_video_sequence(
 
     if video_writer is None:
         raise RuntimeError(
-            f"无法创建视频写入器，尝试的编码器: {preferred_codecs}"
+            f"Failed to create video writer. Tried codecs: {preferred_codecs}"
         )
-    print(f"[INFO] 可视化视频编码器: {selected_codec}")
+    print(f"[INFO] Visualization video codec: {selected_codec}")
     
     for result in tqdm(results, desc="Writing visualization"):
-        # 直接使用第一次生成的vis_frame
+        # Directly use the first generated vis_frame
         video_writer.write(result['vis_frame'])
         
-        # 移除vis_frame以节省内存
+        # Remove vis_frame to save memory
         del result['vis_frame']
     
     video_writer.release()
     time_stats['save'] = time.time() - t_write_start
     
-    # 输出性能统计
+    # Print performance stats
     total_time = sum(time_stats.values())
-    print(f"\n[性能统计]")
-    print(f"  视频读取: {time_stats['read']:.2f}s ({time_stats['read']/total_time*100:.1f}%)")
-    print(f"  模型推理: {time_stats['inference']:.2f}s ({time_stats['inference']/total_time*100:.1f}%)")
-    print(f"  视频写入: {time_stats['save']:.2f}s ({time_stats['save']/total_time*100:.1f}%)")
-    print(f"  总耗时: {total_time:.2f}s")
+    print(f"\n[Performance Stats]")
+    print(f"  Video read: {time_stats['read']:.2f}s ({time_stats['read']/total_time*100:.1f}%)")
+    print(f"  Model inference: {time_stats['inference']:.2f}s ({time_stats['inference']/total_time*100:.1f}%)")
+    print(f"  Video write: {time_stats['save']:.2f}s ({time_stats['save']/total_time*100:.1f}%)")
+    print(f"  Total time: {total_time:.2f}s")
 
-    # 保存 JSON 结果
+    # Save JSON results
     output_json_path.parent.mkdir(parents=True, exist_ok=True)
     save_jsonl_results(output_json_path, results)
 
-    print(f"[INFO] JSON 已保存到: {output_json_path}")
-    print(f"[INFO] 视频已保存到: {output_video_path}")
-    print(f"[INFO] 处理了 {len(results)} 帧")
+    print(f"[INFO] JSON saved to: {output_json_path}")
+    print(f"[INFO] Video saved to: {output_video_path}")
+    print(f"[INFO] Processed {len(results)} frames")
     return True
 
 
 def process_single_sequence_wrapper(seq_dir, gpu_id, args):
-    """包装函数，用于多进程 starmap"""
+    """Wrapper function for multiprocess starmap."""
     return process_single_sequence(seq_dir, args, gpu_id=gpu_id)
 
 
 def process_single_sequence(seq_dir, args, gpu_id=0):
-    """单个序列的处理函数（用于多进程）"""
+    """Process a single sequence (for multiprocessing)."""
     device = torch.device(f'cuda:{gpu_id}' if torch.cuda.is_available() else 'cpu')
     
-    # 性能优化: 启用 PyTorch 后端优化
+    # Performance optimization: enable PyTorch backend optimizations
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     
-    # 加载模型
+    # Load model
     model, model_cfg = load_hamer(args.checkpoint)
     model = model.to(device)
     model.eval()
     
-    # torch.compile 和 FP16 已禁用 (首次运行会很慢)
-    # 如需启用,取消下面的注释:
+    # torch.compile and FP16 are disabled (first run can be slow)
+    # To enable, uncomment below:
     # model = torch.compile(model, mode='reduce-overhead')
     # model = model.half()
     
-    # 加载检测器
+    # Load detector
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
     if args.body_detector == 'vitdet':
         from detectron2.config import LazyConfig
@@ -722,14 +722,14 @@ def process_single_sequence(seq_dir, args, gpu_id=0):
         local_detectron2_ckpt = Path(CACHE_DIR_HAMER) / 'detectron2_models' / 'model_final_f05665.pkl'
         if local_detectron2_ckpt.exists():
             detectron2_cfg.train.init_checkpoint = str(local_detectron2_ckpt)
-            print(f"[INFO] 使用本地 Detectron2 权重: {local_detectron2_ckpt}")
+            print(f"[INFO] Using local Detectron2 weights: {local_detectron2_ckpt}")
         else:
             detectron2_cfg.train.init_checkpoint = (
                 "https://dl.fbaipublicfiles.com/detectron2/ViTDet/COCO/"
                 "cascade_mask_rcnn_vitdet_h/f328730692/model_final_f05665.pkl"
             )
         for i in range(3):
-            detectron2_cfg.model.roi_heads.box_predictors[i].test_score_thresh = 0.5  # 提高阈值减少误检
+            detectron2_cfg.model.roi_heads.box_predictors[i].test_score_thresh = 0.5  # Raise threshold to reduce false positives
         detector = DefaultPredictor_Lazy(detectron2_cfg)
     else:
         from detectron2 import model_zoo
@@ -741,7 +741,7 @@ def process_single_sequence(seq_dir, args, gpu_id=0):
         detectron2_cfg.model.roi_heads.box_predictor.test_nms_thresh = 0.4
         detector = DefaultPredictor_Lazy(detectron2_cfg)
     
-    # 加载关键点检测器
+    # Load keypoint detector
     cpm = ViTPoseModel(device)
     
     chest_video = seq_dir / "chest.mp4"
@@ -749,7 +749,7 @@ def process_single_sequence(seq_dir, args, gpu_id=0):
     output_video = seq_dir / "hamer_visualization.mp4"
     
     if output_json.exists() and not args.overwrite:
-        print(f"[INFO] 已存在 hamer_hands.json，检查缺失手部帧: {seq_dir}")
+        print(f"[INFO] Existing hamer_hands.json found, checking missing hand frames: {seq_dir}")
         if repair_existing_hamer_json(output_json):
             return True
     
@@ -773,7 +773,7 @@ def process_single_sequence(seq_dir, args, gpu_id=0):
 
 
 def find_all_sequences(dataset_root):
-    """扫描数据集，找到所有包含 chest.mp4 的序列"""
+    """Scan dataset and find all sequences containing chest.mp4."""
     dataset_root = Path(dataset_root)
     sequences = []
 
@@ -789,119 +789,119 @@ def find_all_sequences(dataset_root):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='优化版 TouchAnything 数据集处理（并行 + 可视化）')
+    parser = argparse.ArgumentParser(description='Optimized TouchAnything dataset processing (parallel + visualization)')
     parser.add_argument(
         '--checkpoint',
         type=str,
         default=DEFAULT_CHECKPOINT,
-        help='HaMeR 模型 checkpoint 路径'
+        help='Path to HaMeR model checkpoint'
     )
     parser.add_argument(
         '--dataset_root',
         type=str,
         required=True,
-        help='数据集根目录'
+        help='Dataset root directory'
     )
     parser.add_argument(
         '--sequence',
         type=str,
         default=None,
-        help='指定单个序列路径（可选）'
+        help='Path to a single sequence (optional)'
     )
     parser.add_argument(
         '--batch_size',
         type=int,
         default=8,
-        help='HaMeR 推理 batch size'
+        help='HaMeR inference batch size'
     )
     parser.add_argument(
         '--frame_batch_size',
         type=int,
         default=16,
-        help='一次处理的帧数（批量读取优化）'
+        help='Number of frames to process at once (batched read optimization)'
     )
     parser.add_argument(
         '--rescale_factor',
         type=float,
         default=2.0,
-        help='边界框扩展倍数'
+        help='Bounding-box expansion factor'
     )
     parser.add_argument(
         '--body_detector',
         type=str,
         default='vitdet',
         choices=['vitdet', 'regnety'],
-        help='人体检测器类型'
+        help='Body detector type'
     )
     parser.add_argument(
         '--max_frames',
         type=int,
         default=None,
-        help='最大处理帧数（用于测试）'
+        help='Maximum number of frames to process (for testing)'
     )
     parser.add_argument(
         '--num_workers',
         type=int,
         default=4,
-        help='每个GPU的工作进程数'
+        help='Number of worker processes per GPU'
     )
     parser.add_argument(
         '--max_displacement',
         type=float,
         default=0.5,
-        help='异常检测阈值：相邻帧最大允许位移（米），默认0.5米'
+        help='Outlier threshold: max allowed displacement between adjacent frames (m), default 0.5'
     )
     parser.add_argument(
         '--gpu_ids',
         type=str,
         default='0',
-        help='使用的 GPU ID，逗号分隔（如 "0,1,2"）'
+        help='GPU IDs to use, comma-separated (e.g. "0,1,2")'
     )
     parser.add_argument(
         '--overwrite',
         action='store_true',
-        help='覆盖已存在的结果'
+        help='Overwrite existing results'
     )
 
     args = parser.parse_args()
 
-    # 下载模型
-    print("[INFO] 检查模型...")
+    # Download/check models
+    print("[INFO] Checking models...")
     download_models(CACHE_DIR_HAMER)
 
-    # 查找序列
+    # Find sequences
     if args.sequence:
         sequences = [Path(args.sequence)]
     else:
-        print(f"[INFO] 扫描数据集: {args.dataset_root}")
+        print(f"[INFO] Scanning dataset: {args.dataset_root}")
         sequences = find_all_sequences(args.dataset_root)
-        print(f"[INFO] 找到 {len(sequences)} 个序列")
+        print(f"[INFO] Found {len(sequences)} sequences")
 
     if len(sequences) == 0:
-        print("[ERROR] 未找到任何序列")
+        print("[ERROR] No sequences found")
         return
 
-    # 解析 GPU IDs
+    # Parse GPU IDs
     gpu_ids = [int(x.strip()) for x in args.gpu_ids.split(',')]
     
     if args.num_workers == 1 or len(sequences) == 1:
-        # 单进程模式（单个worker或单个序列）
-        print("[INFO] 单进程模式")
+        # Single-process mode (single worker or single sequence)
+        print("[INFO] Single-process mode")
         for idx, seq_dir in enumerate(sequences):
-            print(f"\n[{idx + 1}/{len(sequences)}] 处理序列: {seq_dir}")
+            print(f"\n[{idx + 1}/{len(sequences)}] Processing sequence: {seq_dir}")
             process_single_sequence(seq_dir, args, gpu_id=gpu_ids[0])
     else:
-        # 多进程模式
-        print(f"[INFO] 多进程模式: {args.num_workers} 个进程")
-        print(f"[INFO] 使用 GPU: {gpu_ids}")
+        # Multiprocess mode
+        print(f"[INFO] Multiprocess mode: {args.num_workers} processes")
+        print(f"[INFO] Using GPUs: {gpu_ids}")
         
-        # 设置多进程启动方法为 spawn 以避免 CUDA 初始化问题
+        # Set multiprocessing start method to spawn to avoid CUDA init issues
         mp.set_start_method('spawn', force=True)
         
-        # 为每个序列分配 GPU
+        # Assign GPU to each sequence
         seq_gpu_pairs = [(seq, gpu_ids[i % len(gpu_ids)], args) for i, seq in enumerate(sequences)]
         
-        # 并行处理
+        # Parallel processing
         with mp.Pool(processes=args.num_workers) as pool:
             results = list(tqdm(
                 pool.starmap(process_single_sequence_wrapper, seq_gpu_pairs),
@@ -910,9 +910,9 @@ def main():
             ))
         
         success_count = sum(results)
-        print(f"\n[INFO] 成功处理: {success_count}/{len(sequences)}")
+        print(f"\n[INFO] Successfully processed: {success_count}/{len(sequences)}")
 
-    print("\n[INFO] 全部处理完成！")
+    print("\n[INFO] All processing completed!")
 
 
 if __name__ == '__main__':

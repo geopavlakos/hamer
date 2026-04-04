@@ -1,6 +1,6 @@
 """
-处理 TouchAnything 数据集，为每个序列生成 hamer_hands.json
-数据格式与 rokoko_hands.json 保持一致
+Process the TouchAnything dataset and generate hamer_hands.json for each sequence.
+The output format is aligned with rokoko_hands.json.
 """
 from pathlib import Path
 import torch
@@ -21,8 +21,8 @@ from vitpose_model import ViTPoseModel
 
 def detect_both_hands_boxes(img_cv2, detector, cpm):
     """
-    检测图像中的左右手边界框
-    返回: boxes (N, 4), is_right (N,)
+    Detect left/right hand bounding boxes in an image.
+    Returns: boxes (N, 4), is_right (N,)
     """
     det_out = detector(img_cv2)
     img_rgb = img_cv2[:, :, ::-1].copy()
@@ -47,7 +47,7 @@ def detect_both_hands_boxes(img_cv2, detector, cpm):
     for vitposes in vitposes_out:
         keypoints = vitposes['keypoints']
 
-        # 左手 21 个点
+        # Left hand 21 keypoints
         left_hand_keyp = keypoints[-42:-21]
         left_valid = left_hand_keyp[:, 2] > 0.5
         if np.sum(left_valid) > 3:
@@ -60,7 +60,7 @@ def detect_both_hands_boxes(img_cv2, detector, cpm):
             bboxes.append(left_bbox)
             is_right_list.append(0)
 
-        # 右手 21 个点
+        # Right hand 21 keypoints
         right_hand_keyp = keypoints[-21:]
         right_valid = right_hand_keyp[:, 2] > 0.5
         if np.sum(right_valid) > 3:
@@ -90,8 +90,8 @@ def process_one_frame(
     rescale_factor=2.0
 ):
     """
-    处理单帧图像，返回左右手的 3D 关节点
-    返回: left_pos (21, 3), right_pos (21, 3) 或 None
+    Process a single frame and return 3D hand joints for left and right hands.
+    Returns: left_pos (21, 3), right_pos (21, 3), or None
     """
     boxes, right = detect_both_hands_boxes(img_cv2, detector, cpm)
     if boxes is None:
@@ -148,10 +148,10 @@ def process_one_frame(
             joints_3d = pred_joints_3d[n].detach().cpu().numpy()
             is_right_hand = int(batch['right'][n].detach().cpu().item())
             
-            # 镜像处理
+            # Mirror correction
             joints_3d[:, 0] = (2 * is_right_hand - 1) * joints_3d[:, 0]
             
-            # 转换到相机坐标系
+            # Convert to camera coordinates
             joints_3d_cam = joints_3d + pred_cam_t_full[n][None, :]
 
             if is_right_hand:
@@ -175,11 +175,11 @@ def process_video_sequence(
     max_frames=None
 ):
     """
-    处理视频序列，生成 hamer_hands.json
+    Process a video sequence and generate hamer_hands.json.
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        print(f"[ERROR] 无法打开视频: {video_path}")
+        print(f"[ERROR] Failed to open video: {video_path}")
         return False
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -188,8 +188,8 @@ def process_video_sequence(
     if max_frames is not None:
         total_frames = min(total_frames, max_frames)
 
-    print(f"[INFO] 处理视频: {video_path}")
-    print(f"[INFO] FPS: {fps:.2f}, 总帧数: {total_frames}")
+    print(f"[INFO] Processing video: {video_path}")
+    print(f"[INFO] FPS: {fps:.2f}, Total frames: {total_frames}")
 
     results = []
     frame_index = 0
@@ -200,7 +200,7 @@ def process_video_sequence(
             if not ret or (max_frames is not None and frame_index >= max_frames):
                 break
 
-            # 计算时间戳（假设从 0 开始）
+            # Compute timestamp (assume it starts from 0)
             timestamp = frame_index / fps if fps > 0 else frame_index * 0.033
 
             left_pos, right_pos = process_one_frame(
@@ -214,7 +214,7 @@ def process_video_sequence(
                 rescale_factor
             )
 
-            # 如果没有检测到手，使用空列表
+            # If no hand is detected, use empty lists
             if left_pos is None:
                 left_pos = []
             if right_pos is None:
@@ -234,7 +234,7 @@ def process_video_sequence(
 
     cap.release()
 
-    # 保存结果
+    # Save results
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -243,14 +243,14 @@ def process_video_sequence(
             json.dump(item, f, ensure_ascii=False)
             f.write('\n')
 
-    print(f"[INFO] 已保存到: {output_path}")
-    print(f"[INFO] 处理了 {len(results)} 帧")
+    print(f"[INFO] Saved to: {output_path}")
+    print(f"[INFO] Processed {len(results)} frames")
     return True
 
 
 def find_all_sequences(dataset_root):
     """
-    扫描数据集，找到所有包含 chest.mp4 的序列
+    Scan the dataset and find all sequences containing chest.mp4.
     """
     dataset_root = Path(dataset_root)
     sequences = []
@@ -278,13 +278,13 @@ def main():
         '--dataset_root',
         type=str,
         required=True,
-        help='数据集根目录'
+        help='Dataset root directory'
     )
     parser.add_argument(
         '--sequence',
         type=str,
         default=None,
-        help='指定单个序列路径（可选）'
+        help='Path to a single sequence (optional)'
     )
     parser.add_argument(
         '--batch_size',
@@ -309,13 +309,13 @@ def main():
         '--max_frames',
         type=int,
         default=None,
-        help='最大处理帧数（用于测试）'
+        help='Maximum number of frames to process (for testing)'
     )
 
     args = parser.parse_args()
 
-    # 加载模型
-    print("[INFO] 加载 HaMeR 模型...")
+    # Load model
+    print("[INFO] Loading HaMeR model...")
     download_models(CACHE_DIR_HAMER)
     model, model_cfg = load_hamer(args.checkpoint)
 
@@ -323,8 +323,8 @@ def main():
     model = model.to(device)
     model.eval()
 
-    # 加载检测器
-    print("[INFO] 加载人体检测器...")
+    # Load detector
+    print("[INFO] Loading body detector...")
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
     if args.body_detector == 'vitdet':
         from detectron2.config import LazyConfig
@@ -348,27 +348,27 @@ def main():
         detectron2_cfg.model.roi_heads.box_predictor.test_nms_thresh = 0.4
         detector = DefaultPredictor_Lazy(detectron2_cfg)
 
-    # 加载关键点检测器
-    print("[INFO] 加载 ViTPose 模型...")
+    # Load keypoint detector
+    print("[INFO] Loading ViTPose model...")
     cpm = ViTPoseModel(device)
 
-    # 查找序列
+    # Find sequences
     if args.sequence:
         sequences = [Path(args.sequence)]
     else:
-        print(f"[INFO] 扫描数据集: {args.dataset_root}")
+        print(f"[INFO] Scanning dataset: {args.dataset_root}")
         sequences = find_all_sequences(args.dataset_root)
-        print(f"[INFO] 找到 {len(sequences)} 个序列")
+        print(f"[INFO] Found {len(sequences)} sequences")
 
-    # 处理每个序列
+    # Process each sequence
     for idx, seq_dir in enumerate(sequences):
-        print(f"\n[{idx + 1}/{len(sequences)}] 处理序列: {seq_dir}")
+        print(f"\n[{idx + 1}/{len(sequences)}] Processing sequence: {seq_dir}")
         
         chest_video = seq_dir / "chest.mp4"
         output_json = seq_dir / "hamer_hands.json"
 
         if output_json.exists():
-            print(f"[SKIP] 已存在 hamer_hands.json")
+            print(f"[SKIP] hamer_hands.json already exists")
             continue
 
         success = process_video_sequence(
@@ -385,9 +385,9 @@ def main():
         )
 
         if not success:
-            print(f"[ERROR] 处理失败: {seq_dir}")
+            print(f"[ERROR] Processing failed: {seq_dir}")
 
-    print("\n[INFO] 全部处理完成！")
+    print("\n[INFO] All processing completed!")
 
 
 if __name__ == '__main__':

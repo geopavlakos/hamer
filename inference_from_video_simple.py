@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-从 MP4 视频直接推理触觉压力分布（简化版，在 hamer 目录下运行）
-- 支持单个第一视角视频输入
-- 使用 HaMeR 自动估计手部姿态
-- 生成触觉压力预测视频
+Infer tactile pressure maps directly from an MP4 video (simplified version, run inside the hamer directory).
+- Supports a single egocentric video input
+- Uses HaMeR to estimate hand pose automatically
+- Generates a tactile pressure prediction video
 """
 
 import os
@@ -15,7 +15,7 @@ import torch
 from pathlib import Path
 from tqdm import tqdm
 
-# 预先导入 chumpy 以避免循环导入问题
+# Import chumpy early to avoid cyclic import issues
 chumpy_path = Path(__file__).resolve().parents[1] / 'chumpy'
 if str(chumpy_path) not in sys.path:
     sys.path.insert(0, str(chumpy_path))
@@ -24,14 +24,14 @@ try:
 except ImportError:
     pass
 
-# HaMeR 相关导入
+# HaMeR-related imports
 from hamer.models import load_hamer, DEFAULT_CHECKPOINT
 from hamer.utils import recursive_to
 from hamer.datasets.vitdet_dataset import ViTDetDataset
 from hamer.utils.renderer import cam_crop_to_full
 from vitpose_model import ViTPoseModel
 
-# 添加项目路径
+# Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -40,13 +40,13 @@ from src.utils.config import load_config_with_base
 from src.data.transforms import VideoTransform
 from src.utils.vis_pressure import render_pressure_panel, PRESS_W, PRESS_H, pred_to_21
 
-# 视频布局常量
+# Video layout constants
 CAM_W, CAM_H = 480, 270
 VIDEO_W, VIDEO_H = 1440, 630
 
 
 def detect_both_hands_boxes(img, detector, cpm):
-    """检测图像中的双手边界框"""
+    """Detect both-hand bounding boxes in an image."""
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
     
     if isinstance(detector, DefaultPredictor_Lazy):
@@ -60,16 +60,16 @@ def detect_both_hands_boxes(img, detector, cpm):
     if len(boxes) == 0:
         return None, None
     
-    # 添加置信度分数列（ViTPose 需要 5 列：x1, y1, x2, y2, score）
+    # Append confidence score column (ViTPose expects 5 columns: x1, y1, x2, y2, score)
     boxes_with_scores = np.column_stack([boxes, scores])
     
-    # 使用 ViTPose 检测关键点
+    # Use ViTPose to detect keypoints
     pose_results = cpm.predict_pose(img, [boxes_with_scores])
     
     if len(pose_results) == 0:
         return None, None
     
-    # 判断左右手
+    # Determine left/right hand
     right = []
     valid_boxes = []
     
@@ -81,7 +81,7 @@ def detect_both_hands_boxes(img, detector, cpm):
         if kp is None or len(kp) == 0:
             continue
         
-        # 使用手腕和中指根部的 x 坐标判断左右手
+        # Infer handedness from wrist and middle MCP x-coordinates
         wrist_x = kp[0, 0]
         middle_mcp_x = kp[9, 0]
         is_right = wrist_x < middle_mcp_x
@@ -104,10 +104,10 @@ def extract_hamer_poses_from_video(
     batch_size=8,
     max_frames=None
 ):
-    """从视频中提取 HaMeR 手部姿态"""
+    """Extract HaMeR hand poses from a video."""
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        raise ValueError(f"无法打开视频: {video_path}")
+        raise ValueError(f"Failed to open video: {video_path}")
     
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if max_frames:
@@ -116,9 +116,9 @@ def extract_hamer_poses_from_video(
     poses = []
     frames = []
     
-    print(f"从视频提取手部姿态: {total_frames} 帧")
+    print(f"Extracting hand poses from video: {total_frames} frames")
     
-    with tqdm(total=total_frames, desc="提取姿态") as pbar:
+    with tqdm(total=total_frames, desc="Extracting poses") as pbar:
         frame_idx = 0
         while frame_idx < total_frames:
             ret, frame = cap.read()
@@ -190,13 +190,13 @@ def infer_tactile_from_video(
     video_path, model, device, cfg, hamer_model, hamer_cfg, detector, cpm,
     clip_length=8, frame_interval=1, batch_size=16
 ):
-    """从视频推理触觉压力分布"""
+    """Infer tactile pressure maps from a video."""
     poses, frames = extract_hamer_poses_from_video(
         video_path, detector, cpm, hamer_model, hamer_cfg, device
     )
     
     T = len(frames)
-    print(f"提取到 {T} 帧图像和姿态")
+    print(f"Extracted {T} frames and pose entries")
     
     image_size = cfg['data']['image_size']
     transform = VideoTransform(
@@ -208,16 +208,16 @@ def infer_tactile_from_video(
     
     pred_maps_all = []
     
-    print(f"触觉推理: {(T - clip_length) // frame_interval + 1} 个 clips")
+    print(f"Tactile inference: {(T - clip_length) // frame_interval + 1} clips")
     
     with torch.no_grad():
-        for start_idx in tqdm(range(0, T - clip_length + 1, frame_interval), desc="触觉推理"):
+        for start_idx in tqdm(range(0, T - clip_length + 1, frame_interval), desc="Tactile inference"):
             end_idx = start_idx + clip_length
             
             clip_frames = np.stack([frames[i] for i in range(start_idx, end_idx)])
             frames_t = transform(clip_frames).unsqueeze(0).to(device)
             
-            # 合并左右手姿态 (B, T, 42, 3) - 21个关节点 x 2只手
+            # Merge left and right hand poses (B, T, 42, 3) - 21 joints x 2 hands
             left_poses = np.stack([poses[i]['left_pos'] for i in range(start_idx, end_idx)])
             right_poses = np.stack([poses[i]['right_pos'] for i in range(start_idx, end_idx)])
             combined_poses = np.concatenate([left_poses, right_poses], axis=1)  # (T, 42, 3)
@@ -228,14 +228,14 @@ def infer_tactile_from_video(
                 outputs = model(frames_t, poses=poses_t)
             
             tactile = outputs['tactile'].cpu().numpy()[0]  # (T, 2, 16, 16)
-            pred_maps_all.append(tactile[-1])  # 取最后一帧 (2, 16, 16)
+            pred_maps_all.append(tactile[-1])  # Take the last frame (2, 16, 16)
     
     pred_maps_all = np.array(pred_maps_all)
     return np.array(frames), pred_maps_all
 
 
 def make_video_with_prediction(frames, pred_maps, output_path, fps=10, vmax=1.0):
-    """生成带预测的视频"""
+    """Generate a video with predicted tactile maps."""
     import subprocess
     
     T = frames.shape[0]
@@ -287,11 +287,11 @@ def make_video_with_prediction(frames, pred_maps, output_path, fps=10, vmax=1.0)
     
     ffmpeg_proc.stdin.close()
     ffmpeg_proc.wait()
-    print(f"视频已保存: {output_path}")
+    print(f"Video saved: {output_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='从 MP4 视频推理触觉压力分布')
+    parser = argparse.ArgumentParser(description='Infer tactile pressure maps from an MP4 video')
     parser.add_argument('--video', type=str, required=True)
     parser.add_argument('--checkpoint', type=str, required=True)
     parser.add_argument('--config', type=str, required=True)
@@ -306,27 +306,27 @@ def main():
     args = parser.parse_args()
     
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
-    print(f"使用设备: {device}")
+    print(f"Using device: {device}")
     
-    # 1. 加载触觉模型
-    print("加载触觉预测模型...")
+    # 1. Load tactile prediction model
+    print("Loading tactile prediction model...")
     cfg = load_config_with_base(args.config)
     model = build_model(cfg)
     ckpt = torch.load(args.checkpoint, map_location='cpu')
     state = ckpt.get('model_state_dict', ckpt)
     model.load_state_dict(state, strict=True)
     model.to(device).eval()
-    print("✓ 触觉模型加载完成")
+    print("✓ Tactile model loaded")
     
-    # 2. 加载 HaMeR 模型
-    print("加载 HaMeR 姿态估计模型...")
+    # 2. Load HaMeR pose model
+    print("Loading HaMeR pose estimation model...")
     hamer_model, hamer_cfg = load_hamer(args.hamer_checkpoint)
     hamer_model = hamer_model.to(device)
     hamer_model.eval()
-    print("✓ HaMeR 模型加载完成")
+    print("✓ HaMeR model loaded")
     
-    # 3. 加载检测器
-    print("加载手部检测器...")
+    # 3. Load detector
+    print("Loading hand detector...")
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
     from detectron2.config import LazyConfig
     import hamer
@@ -339,15 +339,15 @@ def main():
         detectron2_cfg.model.roi_heads.box_predictors[i].test_score_thresh = 0.25
     
     detector = DefaultPredictor_Lazy(detectron2_cfg)
-    print("✓ 检测器加载完成")
+    print("✓ Detector loaded")
     
-    # 4. 加载 ViTPose
-    print("加载 ViTPose 关键点检测器...")
+    # 4. Load ViTPose
+    print("Loading ViTPose keypoint detector...")
     cpm = ViTPoseModel(device)
-    print("✓ ViTPose 加载完成")
+    print("✓ ViTPose loaded")
     
-    # 5. 处理视频
-    print(f"\n处理视频: {args.video}")
+    # 5. Process video
+    print(f"\nProcessing video: {args.video}")
     frames, pred_maps = infer_tactile_from_video(
         args.video, model, device, cfg, hamer_model, hamer_cfg, detector, cpm,
         clip_length=cfg['data'].get('clip_length', 8),
@@ -355,11 +355,11 @@ def main():
         batch_size=args.batch_size
     )
     
-    # 6. 生成输出视频
-    print(f"\n生成输出视频...")
+    # 6. Generate output video
+    print(f"\nGenerating output video...")
     make_video_with_prediction(frames, pred_maps, args.output, fps=args.fps, vmax=1.0)
     
-    print(f"\n✓ 完成！输出视频: {args.output}")
+    print(f"\n✓ Done! Output video: {args.output}")
 
 
 if __name__ == '__main__':
